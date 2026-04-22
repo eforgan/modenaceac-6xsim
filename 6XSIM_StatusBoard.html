@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920">
+<title>MODENACEAC · 6XSIM — Estado de Simuladores</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600;700&family=Barlow+Condensed:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+/* ══ RESET & BASE ══════════════════════════════════════════════════════════ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --ink:   #08090d;
+  --paper: #eeeae0;
+  --muted: #7a7870;
+  --bd:    rgba(255,255,255,.08);
+  --green: #0c6e38;
+  --greenl:#0fa34f;
+  --glow:  #1eff7b;
+  --red:   #9e1b1b;
+  --redl:  #d42020;
+  --rglow: #ff7070;
+  --gold:  #c8a84b;
+  --goldl: #e8c96a;
+  --blue:  #1545a0;
+  /* Transición suave */
+  transition: background .25s, color .25s;
+}
+
+/* ── MODO CLARO para el panel de estado ── */
+html.light body{
+  background:#1a1d28;    /* conserva aspecto profesional de sala */
+  color:#e8e4da;
+}
+html.light .col-logo   { background:rgba(0,0,0,.04); border-right-color:rgba(0,0,0,.1); }
+html.light .col-status { background:rgba(0,0,0,.04); border-left-color:rgba(0,0,0,.1);  }
+html.light .col-sim    { border-right-color:rgba(0,0,0,.1); }
+html.light .sim-head   { background:rgba(255,255,255,.06); border-bottom-color:rgba(0,0,0,.12); }
+html.light .kpi        { background:rgba(255,255,255,.08); border-color:rgba(0,0,0,.12); }
+html.light .info-field { background:rgba(255,255,255,.08); border-color:rgba(0,0,0,.1); }
+html.light .prx-block  { background:rgba(158,27,27,.1);    border-color:rgba(158,27,27,.3); }
+html.light .fase-wrap  { background:transparent; }
+html.light .sys-item   { background:rgba(255,255,255,.08); border-color:rgba(0,0,0,.1); }
+html.light .p-sec      { background:rgba(255,255,255,.06); border-color:rgba(0,0,0,.1); }
+html.light .panel      { background:#1e2235; }
+html.light .p-head, html.light .p-ftr { background:#1e2235; }
+html.light .p-inp      { background:rgba(255,255,255,.1); border-color:rgba(255,255,255,.2); }
+
+/* Modo CLARO COMPLETO (pantallas bien iluminadas / día) */
+html.light-full body   { background:#E8E5DC; color:#1a1a18; }
+html.light-full .col-logo  { background:#fff; border-right:1px solid #D3D1C7; }
+html.light-full .col-status{ background:#fff; border-left:1px solid #D3D1C7; }
+html.light-full .col-sim   { border-right:1px solid #D3D1C7; border-top:3px solid #185FA5; }
+html.light-full .col-sim.active  { border-top-color:#0d7a3e; }
+html.light-full .col-sim.waiting { border-top-color:#b01e1e; }
+html.light-full .sim-head  { background:#F5F4F0; border-bottom:1px solid #D3D1C7; }
+html.light-full .c-name,.light-full .sim-name-ttl,.light-full .c-sub,.light-full .sim-name-sub { filter:none; }
+html.light-full .kpi       { background:#F1EFE8; border:0.5px solid #D3D1C7; }
+html.light-full .kpi-val   { color:#1a1a18; }
+html.light-full .kpi-lbl   { color:#5F5E5A; }
+html.light-full .info-field{ background:#fff; border:0.5px solid #D3D1C7; }
+html.light-full .if-lbl    { color:#5F5E5A; }
+html.light-full .if-val    { color:#1a1a18; }
+html.light-full .sep::before,.light-full .sep::after { background:rgba(0,0,0,.1); }
+html.light-full .sep span  { color:#8a8680; }
+html.light-full .prx-block { background:rgba(176,30,30,.06); border:0.5px solid rgba(176,30,30,.25); }
+html.light-full .prx-time, html.light-full .prx-cd { color:#1a1a18; }
+html.light-full .sys-item  { background:#F5F4F0; border:0.5px solid #D3D1C7; }
+html.light-full .sys-item-lbl { color:#5F5E5A; }
+html.light-full .sys-item-val { color:#1a1a18; }
+html.light-full .col-logo  .clk-time { color:#1a1a18; }
+html.light-full .col-logo  .clk-date,.light-full .logo-sub { color:#5F5E5A; }
+html.light-full .col-logo  .udp-txt   { color:#5F5E5A; }
+html.light-full .gold-line { background:#c8a84b; }
+html.light-full .fase-bar .fs { background:#D3D1C7; }
+html.light-full body::after { background:none; }
+html.light-full .panel     { background:#fff; }
+html.light-full .p-head,.light-full .p-ftr { background:#fff; border-color:#D3D1C7; }
+html.light-full .p-sec     { background:#F5F4F0; border-color:#D3D1C7; }
+html.light-full .p-inp     { background:#fff; border-color:#D3D1C7; color:#1a1a18; }
+html.light-full .p-lbl     { color:#5F5E5A; }
+html.light-full .btn-edit  { background:rgba(200,168,75,.15); border-color:rgba(200,168,75,.5); }
+
+html,body{
+  width:100%; height:100%;
+  background:var(--ink);
+  color:var(--paper);
+  font-family:'Barlow',sans-serif;
+  overflow:hidden; /* pantalla completa, sin scroll */
+}
+
+/* Scanlines sutiles */
+body::after{
+  content:'';position:fixed;inset:0;
+  background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.06) 3px,rgba(0,0,0,.06) 6px);
+  pointer-events:none;z-index:9000;
+}
+
+/* ══ LAYOUT APAISADO 100vw × 100vh ════════════════════════════════════════ */
+.root{
+  display:grid;
+  grid-template-columns: 220px 1fr 1fr 180px;
+  grid-template-rows: 100vh;
+  width:100vw; height:100vh;
+  gap:0;
+}
+
+/* ── COLUMNA IZQUIERDA: Logo + reloj ─────────────────────────────────────*/
+.col-logo{
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:24px;
+  background:rgba(255,255,255,.018);
+  border-right:0.5px solid var(--bd);
+  padding:20px 16px;
+}
+.logo-emb{ width:90px; height:90px; }
+.logo-name{
+  font-family:'Bebas Neue',sans-serif; font-size:36px;
+  letter-spacing:.14em; color:var(--goldl); line-height:1; text-align:center;
+}
+.logo-sub{
+  font-family:'Barlow Condensed',sans-serif; font-size:9px;
+  letter-spacing:.2em; color:var(--muted); text-transform:uppercase; text-align:center;
+}
+.gold-line{ width:60px; height:1px; background:var(--gold); opacity:.5; }
+.clk-time{
+  font-family:'Share Tech Mono',monospace; font-size:40px;
+  color:var(--paper); letter-spacing:.04em; line-height:1; text-align:center;
+}
+.clk-date{
+  font-family:'Share Tech Mono',monospace; font-size:10px;
+  color:var(--muted); letter-spacing:.1em; text-align:center; margin-top:4px;
+}
+.badge-6x{
+  display:flex; align-items:center; gap:8px; padding:6px 14px;
+  border:1px solid rgba(200,168,75,.35); border-radius:3px;
+  background:rgba(200,168,75,.07);
+}
+.badge-lbl{
+  font-family:'Bebas Neue',sans-serif; font-size:28px;
+  letter-spacing:.2em; color:var(--goldl);
+}
+.badge-hex{ width:26px; height:26px; }
+
+/* ── COLUMNA SIM 1 ───────────────────────────────────────────────────────*/
+.col-sim{
+  display:flex; flex-direction:column;
+  border-right:0.5px solid var(--bd);
+  position:relative; overflow:hidden;
+}
+.col-sim.active{ border-top:3px solid var(--greenl); }
+.col-sim.waiting{ border-top:3px solid var(--redl); }
+
+/* Header del simulador */
+.sim-head{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 24px 12px;
+  background:rgba(255,255,255,.022);
+  border-bottom:0.5px solid var(--bd);
+  flex-shrink:0;
+}
+.sim-name-ttl{
+  font-family:'Bebas Neue',sans-serif; font-size:28px;
+  letter-spacing:.13em; line-height:1;
+}
+.sim-name-sub{
+  font-family:'Barlow Condensed',sans-serif; font-size:10px;
+  letter-spacing:.2em; color:var(--muted); text-transform:uppercase; margin-top:2px;
+}
+.estado-sq{
+  width:80px; height:80px; border-radius:6px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px;
+  position:relative; overflow:hidden; flex-shrink:0;
+}
+.estado-sq::before{
+  content:''; position:absolute; inset:0;
+  background:repeating-linear-gradient(45deg,transparent,transparent 5px,rgba(0,0,0,.06) 5px,rgba(0,0,0,.06) 10px);
+}
+.sq-g{ background:var(--green); box-shadow:0 0 28px rgba(12,110,56,.5),inset 0 1px 0 rgba(255,255,255,.15); animation:pg 2.5s ease-in-out infinite; }
+.sq-r{ background:var(--red);   box-shadow:0 0 20px rgba(158,27,27,.4),inset 0 1px 0 rgba(255,255,255,.1); }
+@keyframes pg{ 0%,100%{ box-shadow:0 0 20px rgba(12,110,56,.35),inset 0 1px 0 rgba(255,255,255,.15) } 50%{ box-shadow:0 0 46px rgba(12,110,56,.7),inset 0 1px 0 rgba(255,255,255,.15) } }
+.sq-ico{ font-size:26px; position:relative; line-height:1; }
+.sq-lbl{ font-family:'Barlow Condensed',sans-serif; font-size:9px; font-weight:700; letter-spacing:.2em; text-transform:uppercase; color:rgba(255,255,255,.9); position:relative; text-align:center; line-height:1.2; }
+
+/* Body */
+.sim-body{
+  flex:1; display:flex; flex-direction:column; gap:14px;
+  padding:18px 24px; overflow:hidden;
+}
+
+/* KPI grande */
+.kpi-row{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.kpi{
+  background:rgba(255,255,255,.04); border:0.5px solid var(--bd);
+  border-radius:4px; padding:10px 14px;
+}
+.kpi.full{ grid-column:1/-1; }
+.kpi-lbl{
+  font-family:'Barlow Condensed',sans-serif; font-size:9px; font-weight:700;
+  letter-spacing:.22em; text-transform:uppercase; color:var(--muted); margin-bottom:4px;
+}
+.kpi-val{
+  font-family:'Share Tech Mono',monospace; font-size:36px;
+  color:var(--paper); letter-spacing:.04em; line-height:1;
+}
+.kpi-val.lg{ font-size:52px; }
+.kpi-val.tg{ color:var(--glow); }
+.kpi-val.ta{ color:var(--goldl); }
+.kpi-val.tr{ color:var(--rglow); }
+.kpi-val.tm{ color:var(--muted); }
+
+/* Info fields */
+.info-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.info-field{
+  background:rgba(255,255,255,.035); border:0.5px solid rgba(255,255,255,.06);
+  border-radius:4px; padding:10px 14px;
+}
+.info-field.full{ grid-column:1/-1; }
+.if-lbl{
+  font-family:'Barlow Condensed',sans-serif; font-size:9px; font-weight:700;
+  letter-spacing:.22em; text-transform:uppercase; color:var(--muted); margin-bottom:4px;
+}
+.if-val{
+  font-family:'Barlow',sans-serif; font-size:18px; font-weight:500;
+  color:var(--paper); line-height:1.2;
+}
+.if-val.sm{ font-size:14px; }
+
+/* Separador */
+.sep{
+  display:flex; align-items:center; gap:8px; flex-shrink:0;
+}
+.sep::before,.sep::after{ content:''; flex:1; height:0.5px; background:rgba(255,255,255,.07); }
+.sep span{
+  font-family:'Barlow Condensed',sans-serif; font-size:9px; letter-spacing:.22em;
+  text-transform:uppercase; color:var(--muted); white-space:nowrap;
+}
+
+/* Barra de fases */
+.fase-wrap{ flex-shrink:0; }
+.fase-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+.fase-bar{ display:flex; gap:4px; height:7px; }
+.fs{
+  flex:1; border-radius:3px; background:rgba(255,255,255,.1);
+  transition:background .3s;
+}
+.fs.done{ background:var(--green); }
+.fs.cur{ background:var(--goldl); animation:fblink 1.4s ease-in-out infinite; }
+@keyframes fblink{ 0%,100%{opacity:1} 50%{opacity:.3} }
+.fase-names{ display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-top:5px; }
+.fase-names span{ font-family:'Barlow Condensed',sans-serif; font-size:9px; color:var(--muted); text-align:center; letter-spacing:.05em; }
+.fase-names span.cur{ color:var(--goldl); font-weight:700; }
+.fase-tag{
+  display:inline-flex; align-items:center; gap:5px; padding:3px 10px;
+  border-radius:2px; font-family:'Barlow Condensed',sans-serif; font-size:10px;
+  font-weight:700; letter-spacing:.12em; text-transform:uppercase;
+}
+.ftg{ background:rgba(12,110,56,.22); color:var(--glow); border:0.5px solid rgba(12,110,56,.45); }
+.dot-live{ width:6px; height:6px; border-radius:50%; background:var(--glow); animation:fblink 1.4s ease-in-out infinite; }
+
+/* Próxima sesión (espera) */
+.prx-block{
+  background:rgba(158,27,27,.07); border:0.5px solid rgba(158,27,27,.2);
+  border-radius:4px; padding:14px 18px; flex-shrink:0;
+}
+.prx-lbl{ font-family:'Barlow Condensed',sans-serif; font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:var(--rglow); font-weight:700; margin-bottom:6px; }
+.prx-time{ font-family:'Share Tech Mono',monospace; font-size:64px; color:var(--paper); letter-spacing:.04em; line-height:1; }
+.prx-cd{ font-family:'Share Tech Mono',monospace; font-size:16px; color:var(--muted); margin-top:5px; }
+.prx-cd b{ color:var(--rglow); font-size:20px; }
+
+/* ── COLUMNA DERECHA: estado general ─────────────────────────────────────*/
+.col-status{
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:16px;
+  background:rgba(255,255,255,.018);
+  border-left:0.5px solid var(--bd);
+  padding:20px 14px;
+}
+.sys-title{
+  font-family:'Barlow Condensed',sans-serif; font-size:10px; font-weight:700;
+  letter-spacing:.22em; text-transform:uppercase; color:var(--muted); text-align:center;
+}
+.sys-item{
+  background:rgba(255,255,255,.04); border:0.5px solid var(--bd);
+  border-radius:5px; padding:12px 14px; width:100%; text-align:center;
+}
+.sys-item-lbl{ font-family:'Barlow Condensed',sans-serif; font-size:8px; letter-spacing:.22em; text-transform:uppercase; color:var(--muted); margin-bottom:4px; font-weight:700; }
+.sys-item-val{ font-family:'Share Tech Mono',monospace; font-size:22px; color:var(--paper); letter-spacing:.04em; }
+.sys-item-val.ok{ color:var(--glow); }
+.sys-item-val.err{ color:var(--rglow); }
+.sys-item-val.warn{ color:var(--goldl); }
+
+.udp-row{ display:flex; align-items:center; gap:6px; }
+.udp-dot{ width:7px; height:7px; border-radius:50%; background:var(--glow); animation:pg 2.5s ease-in-out infinite; flex-shrink:0; }
+.udp-txt{ font-family:'Share Tech Mono',monospace; font-size:9px; color:var(--muted); letter-spacing:.06em; }
+
+/* Botón editar */
+.btn-edit{
+  width:100%; padding:9px 12px; border-radius:5px;
+  background:rgba(200,168,75,.13); border:1px solid rgba(200,168,75,.4);
+  color:var(--goldl); cursor:pointer; font-family:'Barlow Condensed',sans-serif;
+  font-size:11px; font-weight:700; letter-spacing:.14em; text-transform:uppercase;
+  transition:all .2s; text-align:center;
+}
+.btn-edit:hover{ background:rgba(200,168,75,.28); }
+
+/* ══ PANEL EDITOR (modal) ══════════════════════════════════════════════════ */
+.overlay{
+  display:none; position:fixed; inset:0; z-index:7000;
+  background:rgba(0,0,0,.75); align-items:center; justify-content:center;
+  backdrop-filter:blur(4px);
+}
+.overlay.open{ display:flex; }
+.panel{
+  background:#0f1117; border:0.5px solid rgba(200,168,75,.28);
+  border-radius:10px; width:min(1100px,96vw); max-height:90vh; overflow-y:auto;
+  box-shadow:0 30px 80px rgba(0,0,0,.6);
+}
+.p-head{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 22px; border-bottom:0.5px solid rgba(200,168,75,.18);
+  position:sticky; top:0; z-index:1; background:#0f1117;
+}
+.p-ttl{ font-family:'Bebas Neue',sans-serif; font-size:20px; letter-spacing:.16em; color:var(--goldl); }
+.p-sub{ font-size:9px; color:var(--muted); margin-top:1px; letter-spacing:.1em; }
+.p-cls{ background:none; border:none; font-size:22px; color:var(--muted); cursor:pointer; line-height:1; padding:0 4px; }
+.p-cls:hover{ color:var(--paper); }
+.p-body{ padding:20px 22px; display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+.p-sec{
+  background:rgba(255,255,255,.04); border:0.5px solid rgba(255,255,255,.07);
+  border-radius:8px; padding:16px;
+}
+.p-sec-ttl{
+  font-family:'Barlow Condensed',sans-serif; font-size:11px; font-weight:700;
+  letter-spacing:.2em; text-transform:uppercase; color:var(--goldl);
+  margin-bottom:12px; padding-bottom:8px; border-bottom:0.5px solid rgba(200,168,75,.18);
+  display:flex; align-items:center; gap:7px;
+}
+.pdot{ width:8px; height:8px; border-radius:50%; }
+.pdot-g{background:var(--green);} .pdot-r{background:var(--red);}
+.p-grid{ display:grid; grid-template-columns:1fr 1fr; gap:9px; }
+.p-grid.g3{ grid-template-columns:1fr 1fr 1fr; }
+.p-fld{ display:flex; flex-direction:column; gap:4px; }
+.p-fld.full{ grid-column:1/-1; }
+.p-lbl{ font-family:'Barlow Condensed',sans-serif; font-size:8.5px; font-weight:700; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); }
+.p-inp{
+  background:rgba(255,255,255,.07); border:0.5px solid rgba(255,255,255,.13);
+  border-radius:5px; padding:7px 9px; color:var(--paper);
+  font-family:'Barlow',sans-serif; font-size:12px; font-weight:500;
+  outline:none; transition:border-color .15s; width:100%;
+}
+.p-inp:focus{ border-color:rgba(200,168,75,.48); }
+.p-inp::placeholder{ color:var(--muted); font-weight:400; }
+.p-inp[type="number"]{ font-family:'Share Tech Mono',monospace; }
+select.p-inp{ cursor:pointer; }
+.est-tog{ display:flex; gap:7px; margin-bottom:12px; }
+.est-btn{
+  flex:1; padding:8px; border-radius:6px; cursor:pointer;
+  font-family:'Barlow Condensed',sans-serif; font-size:11px; font-weight:700;
+  letter-spacing:.1em; text-transform:uppercase; border:1px solid; transition:all .15s; text-align:center;
+}
+.ea{ background:rgba(12,110,56,.12); border-color:rgba(12,110,56,.45); color:var(--glow); }
+.ee{ background:rgba(158,27,27,.1);  border-color:rgba(158,27,27,.4);  color:var(--rglow); }
+.ea.sel{ background:rgba(12,110,56,.3); box-shadow:0 0 10px rgba(12,110,56,.2); }
+.ee.sel{ background:rgba(158,27,27,.28); box-shadow:0 0 10px rgba(158,27,27,.18); }
+.fase-sel{ display:flex; flex-wrap:wrap; gap:5px; }
+.fb{
+  padding:4px 9px; border-radius:4px; font-family:'Barlow Condensed',sans-serif;
+  font-size:9.5px; font-weight:600; letter-spacing:.1em; text-transform:uppercase;
+  cursor:pointer; border:0.5px solid rgba(255,255,255,.13);
+  background:rgba(255,255,255,.05); color:var(--muted); transition:all .15s;
+}
+.fb.sel{ background:rgba(200,168,75,.18); border-color:var(--gold); color:var(--goldl); }
+.p-ftr{
+  display:flex; gap:9px; justify-content:flex-end;
+  padding:12px 22px; border-top:0.5px solid rgba(255,255,255,.07);
+  position:sticky; bottom:0; background:#0f1117;
+}
+.btn-ok{
+  background:rgba(12,110,56,.22); border:1px solid rgba(12,110,56,.55);
+  color:var(--glow); border-radius:7px; padding:9px 22px;
+  font-family:'Barlow Condensed',sans-serif; font-size:12px; font-weight:700;
+  letter-spacing:.12em; text-transform:uppercase; cursor:pointer; transition:all .15s;
+}
+.btn-ok:hover{ background:rgba(12,110,56,.38); }
+.btn-cc{
+  background:rgba(255,255,255,.04); border:0.5px solid rgba(255,255,255,.1);
+  color:var(--muted); border-radius:7px; padding:9px 16px;
+  font-family:'Barlow Condensed',sans-serif; font-size:12px; font-weight:600;
+  letter-spacing:.1em; text-transform:uppercase; cursor:pointer; transition:all .15s;
+}
+.btn-cc:hover{ color:var(--paper); }
+.toast{
+  position:fixed; bottom:20px; right:20px; z-index:9999;
+  background:rgba(12,110,56,.3); border:1px solid rgba(12,110,56,.55);
+  border-radius:8px; padding:9px 18px; color:var(--glow);
+  font-family:'Barlow Condensed',sans-serif; font-size:11px; font-weight:700;
+  letter-spacing:.1em; text-transform:uppercase; opacity:0; transform:translateY(8px);
+  transition:all .3s; pointer-events:none;
+}
+.toast.show{ opacity:1; transform:translateY(0); }
+</style>
+</head>
+<body>
+
+<div class="root">
+
+  <!-- ══ COL 1: LOGO + RELOJ ══════════════════════════════════════════════ -->
+  <div class="col-logo">
+    <svg class="logo-emb" viewBox="0 0 96 96" fill="none">
+      <polygon points="48,6 90,27 90,69 48,90 6,69 6,27" fill="none" stroke="#c8a84b" stroke-width="2"/>
+      <polygon points="48,15 81,33 81,63 48,81 15,63 15,33" fill="none" stroke="#c8a84b" stroke-width="0.8" opacity=".3"/>
+      <circle cx="48" cy="48" r="15" fill="none" stroke="#c8a84b" stroke-width="1.5"/>
+      <circle cx="48" cy="48" r="5" fill="#c8a84b"/>
+      <line x1="33" y1="48" x2="15" y2="48" stroke="#c8a84b" stroke-width="2" stroke-linecap="round"/>
+      <line x1="63" y1="48" x2="81" y2="48" stroke="#c8a84b" stroke-width="2" stroke-linecap="round"/>
+      <line x1="48" y1="33" x2="48" y2="15" stroke="#c8a84b" stroke-width="2" stroke-linecap="round"/>
+      <line x1="48" y1="63" x2="48" y2="81" stroke="#c8a84b" stroke-width="2" stroke-linecap="round"/>
+      <line x1="37" y1="37" x2="22" y2="22" stroke="#c8a84b" stroke-width="1.2" opacity=".4"/>
+      <line x1="59" y1="37" x2="74" y2="22" stroke="#c8a84b" stroke-width="1.2" opacity=".4"/>
+      <line x1="37" y1="59" x2="22" y2="74" stroke="#c8a84b" stroke-width="1.2" opacity=".4"/>
+      <line x1="59" y1="59" x2="74" y2="74" stroke="#c8a84b" stroke-width="1.2" opacity=".4"/>
+    </svg>
+    <div>
+      <div class="logo-name">MODENACEAC</div>
+      <div class="logo-sub" style="margin-top:3px">Centro de Entrenamiento<br>Aeronáutico</div>
+    </div>
+    <div class="gold-line"></div>
+    <div class="badge-6x">
+      <svg class="badge-hex" viewBox="0 0 28 28" fill="none">
+        <polygon points="14,2 25,8 25,20 14,26 3,20 3,8" fill="rgba(200,168,75,.1)" stroke="#c8a84b" stroke-width="1.2"/>
+        <text x="14" y="17" text-anchor="middle" font-family="Bebas Neue,sans-serif" font-size="9" fill="#c8a84b" letter-spacing="1">SIM</text>
+      </svg>
+      <span class="badge-lbl">6XSIM</span>
+    </div>
+    <div class="gold-line"></div>
+    <div>
+      <div class="clk-time" id="clock">--:--:--</div>
+      <div class="clk-date" id="datestr">---</div>
+    </div>
+    <div class="gold-line"></div>
+    <div style="display:flex;flex-direction:column;gap:5px;width:100%">
+  <button class="btn-edit" onclick="abrirEditor()">⚙ Editar sesión</button>
+  <div style="display:flex;gap:4px">
+    <button onclick="setTheme('dark')"       id="th-dark"  title="Oscuro (sala)"  style="flex:1;padding:6px 4px;border-radius:5px;border:1px solid rgba(200,168,75,.3);background:rgba(200,168,75,.1);color:var(--goldl);cursor:pointer;font-size:11px;font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:.06em;transition:all .2s">🌙 Sala</button>
+    <button onclick="setTheme('light')"      id="th-light" title="Medio"          style="flex:1;padding:6px 4px;border-radius:5px;border:1px solid rgba(200,168,75,.3);background:rgba(200,168,75,.1);color:var(--goldl);cursor:pointer;font-size:11px;font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:.06em;transition:all .2s">🌆 Medio</button>
+    <button onclick="setTheme('light-full')" id="th-lf"   title="Claro (día)"    style="flex:1;padding:6px 4px;border-radius:5px;border:1px solid rgba(200,168,75,.3);background:rgba(200,168,75,.1);color:var(--goldl);cursor:pointer;font-size:11px;font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:.06em;transition:all .2s">☀ Día</button>
+  </div>
+</div>
+    <div class="udp-row">
+      <div class="udp-dot"></div>
+      <div class="udp-txt">UDP 49001/49002</div>
+    </div>
+  </div>
+
+  <!-- ══ COL 2: SIMULADOR 1 ═══════════════════════════════════════════════ -->
+  <div class="col-sim" id="col1">
+    <div class="sim-head">
+      <div>
+        <div class="sim-name-ttl" id="s1-nom">AgustaWestland AW109E</div>
+        <div class="sim-name-sub" id="s1-sub">Simulador bimotor turbina · X-Plane 11.55r2</div>
+      </div>
+      <div class="estado-sq" id="s1-sq">
+        <span class="sq-ico" id="s1-ico">✈</span>
+        <span class="sq-lbl" id="s1-lbl">SESIÓN<br>ACTIVA</span>
+      </div>
+    </div>
+    <div class="sim-body" id="s1-body"></div>
+  </div>
+
+  <!-- ══ COL 3: SIMULADOR 2 ═══════════════════════════════════════════════ -->
+  <div class="col-sim" id="col2">
+    <div class="sim-head">
+      <div>
+        <div class="sim-name-ttl" id="s2-nom">Robinson R44 II</div>
+        <div class="sim-name-sub" id="s2-sub">Simulador monomotor pistón · X-Plane 11.55r2</div>
+      </div>
+      <div class="estado-sq" id="s2-sq">
+        <span class="sq-ico" id="s2-ico">⏸</span>
+        <span class="sq-lbl" id="s2-lbl">EN<br>ESPERA</span>
+      </div>
+    </div>
+    <div class="sim-body" id="s2-body"></div>
+  </div>
+
+  <!-- ══ COL 4: ESTADO GENERAL ════════════════════════════════════════════ -->
+  <div class="col-status">
+    <div class="sys-title">Estado del<br>sistema</div>
+    <div class="sys-item">
+      <div class="sys-item-lbl">X-Plane 1</div>
+      <div class="sys-item-val ok" id="xp1-st">● OK</div>
+    </div>
+    <div class="sys-item">
+      <div class="sys-item-lbl">X-Plane 2</div>
+      <div class="sys-item-val warn" id="xp2-st">◉ STANDBY</div>
+    </div>
+    <div class="sys-item">
+      <div class="sys-item-lbl">Bridge 1</div>
+      <div class="sys-item-val ok" id="br1-st">● OK</div>
+    </div>
+    <div class="sys-item">
+      <div class="sys-item-lbl">Bridge 2</div>
+      <div class="sys-item-val warn" id="br2-st">◉ STANDBY</div>
+    </div>
+    <div class="gold-line"></div>
+    <div class="sys-item">
+      <div class="sys-item-lbl">Sesiones hoy</div>
+      <div class="sys-item-val" id="ses-hoy">2</div>
+    </div>
+    <div class="sys-item">
+      <div class="sys-item-lbl">Instructor</div>
+      <div class="sys-item-val" style="font-size:14px;color:var(--goldl);font-family:'Barlow Condensed',sans-serif;letter-spacing:.04em" id="ins-ref">E. Forgan</div>
+    </div>
+  </div>
+
+</div><!-- /root -->
+
+<!-- ══ PANEL EDITOR ════════════════════════════════════════════════════════ -->
+<div class="overlay" id="overlay" onclick="if(event.target===this)cerrar()">
+<div class="panel">
+  <div class="p-head">
+    <div>
+      <div class="p-ttl">⚙ Editor de sesión — Panel apaisado 6XSIM</div>
+      <div class="p-sub">Completá los datos · los cambios se aplican instantáneamente · sin tocar código</div>
+    </div>
+    <button class="p-cls" onclick="cerrar()">✕</button>
+  </div>
+  <div class="p-body">
+
+    <!-- SIM 1 -->
+    <div class="p-sec">
+      <div class="p-sec-ttl"><span class="pdot pdot-g"></span>Simulador 1 — AW109E</div>
+      <div class="est-tog">
+        <button class="est-btn ea sel" id="s1ba" onclick="setE(1,'activo')">● Sesión activa</button>
+        <button class="est-btn ee"     id="s1be" onclick="setE(1,'espera')">⏸ En espera</button>
+      </div>
+      <div class="p-grid">
+        <div class="p-fld"><label class="p-lbl">Nombre del simulador</label><input class="p-inp" id="f-s1-nom" value="AgustaWestland AW109E"></div>
+        <div class="p-fld"><label class="p-lbl">Tipo / plataforma</label><input class="p-inp" id="f-s1-sub" value="Simulador bimotor turbina · X-Plane 11.55r2"></div>
+        <div class="p-fld"><label class="p-lbl">Instructor</label><input class="p-inp" id="f-s1-ins" value="Eduardo Forgan"></div>
+        <div class="p-fld"><label class="p-lbl">Alumno / Piloto</label><input class="p-inp" id="f-s1-alu" value="Cap. Diego Ferreira"></div>
+        <div class="p-fld full"><label class="p-lbl">Tema / Ejercicio</label><input class="p-inp" id="f-s1-tema" value="Procedimientos OEI motor #1 e ILS con falla AFCS"></div>
+      </div>
+      <div id="s1-ha" style="margin-top:10px">
+        <div class="p-grid g3">
+          <div class="p-fld"><label class="p-lbl">Hora de inicio</label><input class="p-inp" type="time" id="f-s1-ini" value="14:00"></div>
+          <div class="p-fld"><label class="p-lbl">Duración (min)</label><input class="p-inp" type="number" id="f-s1-dur" min="30" max="480" step="15" value="120"></div>
+          <div class="p-fld"><label class="p-lbl">Estado técnico</label><select class="p-inp" id="f-s1-tec"><option value="OK">● Operativo</option><option value="MANT">⚠ Mantenimiento</option><option value="OFF">✕ Fuera de servicio</option></select></div>
+        </div>
+        <div class="p-fld" style="margin-top:9px">
+          <div class="p-lbl">Fase del vuelo actual</div>
+          <div class="fase-sel" id="fs1">
+            <button class="fb" onclick="sf(1,0)">Briefing</button><button class="fb" onclick="sf(1,1)">Arranque</button><button class="fb" onclick="sf(1,2)">Despegue</button><button class="fb sel" onclick="sf(1,3)">En vuelo</button><button class="fb" onclick="sf(1,4)">Aproximación</button><button class="fb" onclick="sf(1,5)">Aterrizaje</button><button class="fb" onclick="sf(1,6)">Debriefing</button>
+          </div>
+        </div>
+      </div>
+      <div id="s1-he" style="display:none;margin-top:10px">
+        <div class="p-grid">
+          <div class="p-fld"><label class="p-lbl">Hora próxima sesión</label><input class="p-inp" type="time" id="f-s1-prx" value="16:30"></div>
+          <div class="p-fld"><label class="p-lbl">FlyWithLua Bridge</label><select class="p-inp" id="f-s1-bri"><option value="OK">● Activo</option><option value="STANDBY">◉ Standby</option><option value="OFF">✕ Desconectado</option></select></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SIM 2 -->
+    <div class="p-sec">
+      <div class="p-sec-ttl"><span class="pdot pdot-r"></span>Simulador 2 — R44 II</div>
+      <div class="est-tog">
+        <button class="est-btn ea"     id="s2ba" onclick="setE(2,'activo')">● Sesión activa</button>
+        <button class="est-btn ee sel" id="s2be" onclick="setE(2,'espera')">⏸ En espera</button>
+      </div>
+      <div class="p-grid">
+        <div class="p-fld"><label class="p-lbl">Nombre del simulador</label><input class="p-inp" id="f-s2-nom" value="Robinson R44 II"></div>
+        <div class="p-fld"><label class="p-lbl">Tipo / plataforma</label><input class="p-inp" id="f-s2-sub" value="Simulador monomotor pistón · X-Plane 11.55r2"></div>
+        <div class="p-fld"><label class="p-lbl">Instructor</label><input class="p-inp" id="f-s2-ins" value="Eduardo Forgan"></div>
+        <div class="p-fld"><label class="p-lbl">Alumno / Piloto</label><input class="p-inp" id="f-s2-alu" value="Tte. Ana Suárez"></div>
+        <div class="p-fld full"><label class="p-lbl">Tema / Ejercicio</label><input class="p-inp" id="f-s2-tema" value="Gov. failure · autorrotación · pérdida rotor de cola en hover"></div>
+      </div>
+      <div id="s2-he" style="margin-top:10px">
+        <div class="p-grid">
+          <div class="p-fld"><label class="p-lbl">Hora próxima sesión</label><input class="p-inp" type="time" id="f-s2-prx" value="16:30"></div>
+          <div class="p-fld"><label class="p-lbl">FlyWithLua Bridge</label><select class="p-inp" id="f-s2-bri"><option value="OK">● Activo</option><option value="STANDBY" selected>◉ Standby</option><option value="OFF">✕ Desconectado</option></select></div>
+        </div>
+      </div>
+      <div id="s2-ha" style="display:none;margin-top:10px">
+        <div class="p-grid g3">
+          <div class="p-fld"><label class="p-lbl">Hora de inicio</label><input class="p-inp" type="time" id="f-s2-ini" value="09:00"></div>
+          <div class="p-fld"><label class="p-lbl">Duración (min)</label><input class="p-inp" type="number" id="f-s2-dur" min="30" max="480" step="15" value="120"></div>
+          <div class="p-fld"><label class="p-lbl">Estado técnico</label><select class="p-inp" id="f-s2-tec"><option value="OK">● Operativo</option><option value="MANT">⚠ Mantenimiento</option><option value="OFF">✕ Fuera de servicio</option></select></div>
+        </div>
+        <div class="p-fld" style="margin-top:9px">
+          <div class="p-lbl">Fase del vuelo actual</div>
+          <div class="fase-sel" id="fs2">
+            <button class="fb" onclick="sf(2,0)">Briefing</button><button class="fb" onclick="sf(2,1)">Arranque</button><button class="fb" onclick="sf(2,2)">Despegue</button><button class="fb" onclick="sf(2,3)">En vuelo</button><button class="fb" onclick="sf(2,4)">Aproximación</button><button class="fb" onclick="sf(2,5)">Aterrizaje</button><button class="fb" onclick="sf(2,6)">Debriefing</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Columna estado -->
+    <div class="p-sec" style="grid-column:1/-1">
+      <div class="p-sec-ttl"><span class="pdot" style="background:var(--gold)"></span>Estado general del sistema</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+        <div class="p-fld"><label class="p-lbl">X-Plane Sim 1</label><select class="p-inp" id="f-xp1"><option value="OK">● Activo</option><option value="STANDBY">◉ Standby</option><option value="OFF">✕ Apagado</option></select></div>
+        <div class="p-fld"><label class="p-lbl">X-Plane Sim 2</label><select class="p-inp" id="f-xp2"><option value="OK">● Activo</option><option value="STANDBY" selected>◉ Standby</option><option value="OFF">✕ Apagado</option></select></div>
+        <div class="p-fld"><label class="p-lbl">Sesiones hoy</label><input class="p-inp" type="number" id="f-ses-hoy" min="0" max="20" value="2"></div>
+        <div class="p-fld"><label class="p-lbl">Instructor referencia</label><input class="p-inp" id="f-ins-ref" value="E. Forgan"></div>
+      </div>
+    </div>
+
+  </div>
+  <div class="p-ftr">
+    <button class="btn-cc" onclick="cerrar()">Cancelar</button>
+    <button class="btn-ok" onclick="aplicar()">✓ Aplicar cambios</button>
+  </div>
+</div>
+</div>
+
+<div class="toast" id="toast">✓ Cambios aplicados</div>
+
+<script>
+/* ── ESTADO ─────────────────────────────────────────────────────────── */
+var S={
+  1:{est:'activo',nom:'AgustaWestland AW109E',sub:'Simulador bimotor turbina · X-Plane 11.55r2',
+     ins:'Eduardo Forgan',alu:'Cap. Diego Ferreira',tema:'Procedimientos OEI motor #1 e ILS con falla AFCS',
+     ini:'14:00',dur:120,fase:3,tec:'OK',prx:'16:30',bri:'OK'},
+  2:{est:'espera',nom:'Robinson R44 II',sub:'Simulador monomotor pistón · X-Plane 11.55r2',
+     ins:'Eduardo Forgan',alu:'Tte. Ana Suárez',tema:'Gov. failure · autorrotación · pérdida rotor de cola en hover',
+     ini:'09:00',dur:120,fase:0,tec:'OK',prx:'16:30',bri:'STANDBY'}
+};
+
+var FASES=['BRIEF','ARRAN','DESPE','VUELO','APROX','ATERR','DEBRIEF'];
+var DIAS=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+var MES=['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
+
+function pad(n){return String(n).padStart(2,'0');}
+function fin(i,d){var p=i.split(':').map(Number),t=p[0]*60+p[1]+d;return pad(Math.floor(t/60))+':'+pad(t%60);}
+function $$(i){return document.getElementById(i);}
+function gv(i){var e=$$(i);return e?e.value:'';}
+function sv(i,v){var e=$$(i);if(e)e.value=v;}
+function selOpt(id,v){var e=$$(id);if(!e)return;for(var i=0;i<e.options.length;i++)if(e.options[i].value===v){e.selectedIndex=i;break;}}
+
+/* ── RELOJ ──────────────────────────────────────────────────────────── */
+function tick(){
+  var n=new Date(),h=n.getHours(),m=n.getMinutes(),s=n.getSeconds();
+  $$('clock').textContent=pad(h)+':'+pad(m)+':'+pad(s);
+  $$('datestr').textContent=DIAS[n.getDay()]+' '+pad(n.getDate())+' '+MES[n.getMonth()]+' '+n.getFullYear();
+  [1,2].forEach(function(n2){
+    var s2=S[n2];
+    if(s2.est==='activo'){
+      var p=s2.ini.split(':').map(Number),is2=p[0]*3600+p[1]*60,ns2=h*3600+m*60+s,d=Math.max(0,ns2-is2);
+      var el=$$('el'+n2);if(el)el.textContent=pad(Math.floor(d/3600))+':'+pad(Math.floor((d%3600)/60))+':'+pad(d%60);
+    } else {
+      var p2=s2.prx.split(':').map(Number),ps=p2[0]*3600+p2[1]*60,ns3=h*3600+m*60+s,d2=ps-ns3;
+      var cd=$$('cd'+n2);
+      if(cd){
+        if(d2>0){var ch=Math.floor(d2/3600),cm=Math.floor((d2%3600)/60),cs=d2%60;
+          cd.innerHTML=(ch?ch+'h ':'')+pad(cm)+' min '+pad(cs)+'s';}
+        else cd.innerHTML='<b style="color:#ff3a3a;font-size:1.4em">AHORA</b>';
+      }
+    }
+  });
+}
+
+/* ── RENDER CARDS ───────────────────────────────────────────────────── */
+function renderCard(n){
+  var s=S[n];
+  $$('s'+n+'-nom').textContent=s.nom;
+  $$('s'+n+'-sub').textContent=s.sub;
+  var col=$$('col'+n);
+  col.className='col-sim '+(s.est==='activo'?'active':'waiting');
+  var sq=$$('s'+n+'-sq');
+  sq.className='estado-sq '+(s.est==='activo'?'sq-g':'sq-r');
+  $$('s'+n+'-ico').textContent=s.est==='activo'?'✈':'⏸';
+  $$('s'+n+'-lbl').innerHTML=s.est==='activo'?'SESIÓN<br>ACTIVA':'EN<br>ESPERA';
+
+  var body=$$('s'+n+'-body');
+  var bt={OK:'<span style="color:var(--glow)">● OPERATIVO</span>',MANT:'<span style="color:var(--goldl)">⚠ MANT.</span>',OFF:'<span style="color:var(--rglow)">✕ FUERA</span>'};
+  var bb={OK:'<span style="color:var(--glow)">● ACTIVO</span>',STANDBY:'<span style="color:#7ab0ff">◉ STANDBY</span>',OFF:'<span style="color:var(--rglow)">✕ OFF</span>'};
+
+  if(s.est==='activo'){
+    body.innerHTML=
+    '<div class="kpi-row">'+
+      '<div class="kpi"><div class="kpi-lbl">Inicio</div><div class="kpi-val tg">'+s.ini+'</div></div>'+
+      '<div class="kpi"><div class="kpi-lbl">Fin previsto</div><div class="kpi-val ta">'+fin(s.ini,s.dur)+'</div></div>'+
+    '</div>'+
+    '<div class="kpi full"><div class="kpi-lbl">Tiempo transcurrido</div><div class="kpi-val lg" id="el'+n+'">00:00:00</div></div>'+
+    '<div class="sep"><span>Tripulación</span></div>'+
+    '<div class="info-grid">'+
+      '<div class="info-field"><div class="if-lbl">Instructor</div><div class="if-val">'+s.ins+'</div></div>'+
+      '<div class="info-field"><div class="if-lbl">Alumno / Piloto</div><div class="if-val">'+s.alu+'</div></div>'+
+      '<div class="info-field full"><div class="if-lbl">Tema / Ejercicio</div><div class="if-val sm">'+s.tema+'</div></div>'+
+    '</div>'+
+    '<div class="sep"><span>Fase del vuelo</span></div>'+
+    '<div class="fase-wrap">'+
+      '<div class="fase-header">'+
+        '<span class="if-lbl">Progreso de vuelo</span>'+
+        '<span class="fase-tag ftg"><span class="dot-live"></span>&nbsp;'+FASES[s.fase]+'</span>'+
+      '</div>'+
+      '<div class="fase-bar">'+FASES.map(function(_,i){return '<div class="fs'+(i<s.fase?' done':i===s.fase?' cur':'')+'"></div>';}).join('')+'</div>'+
+      '<div class="fase-names">'+FASES.map(function(f,i){return '<span class="'+(i===s.fase?'cur':'')+'">'+f+'</span>';}).join('')+'</div>'+
+    '</div>'+
+    '<div class="info-grid">'+
+      '<div class="info-field"><div class="if-lbl">Estado técnico</div><div class="if-val sm">'+bt[s.tec]+'</div></div>'+
+      '<div class="info-field"><div class="if-lbl">Bridge UDP</div><div class="if-val sm">'+bb[s.bri]+'</div></div>'+
+    '</div>';
+  } else {
+    body.innerHTML=
+    '<div class="prx-block">'+
+      '<div class="prx-lbl">▸ Próxima sesión programada</div>'+
+      '<div class="prx-time">'+s.prx+'</div>'+
+      '<div class="prx-cd">Comienza en <b id="cd'+n+'">-- min</b></div>'+
+    '</div>'+
+    '<div class="sep"><span>Próxima sesión</span></div>'+
+    '<div class="info-grid">'+
+      '<div class="info-field"><div class="if-lbl">Instructor</div><div class="if-val">'+s.ins+'</div></div>'+
+      '<div class="info-field"><div class="if-lbl">Alumno / Piloto</div><div class="if-val">'+s.alu+'</div></div>'+
+      '<div class="kpi-row" style="grid-column:1/-1">'+
+        '<div class="kpi"><div class="kpi-lbl">Hora prevista</div><div class="kpi-val tr">'+s.prx+'</div></div>'+
+        '<div class="kpi"><div class="kpi-lbl">Fin previsto</div><div class="kpi-val tm">'+fin(s.prx,s.dur)+'</div></div>'+
+      '</div>'+
+      '<div class="info-field full"><div class="if-lbl">Tema / Ejercicio</div><div class="if-val sm">'+s.tema+'</div></div>'+
+    '</div>'+
+    '<div class="sep"><span>Estado técnico</span></div>'+
+    '<div class="info-grid">'+
+      '<div class="info-field"><div class="if-lbl">X-Plane</div><div class="if-val sm"><span style="color:#7ab0ff">◉ STANDBY</span></div></div>'+
+      '<div class="info-field"><div class="if-lbl">Bridge UDP</div><div class="if-val sm">'+bb[s.bri]+'</div></div>'+
+    '</div>';
+  }
+}
+
+/* Estado columna derecha */
+var XPS={OK:'<span style="color:var(--glow)">● OK</span>',STANDBY:'<span style="color:#7ab0ff">◉ STANDBY</span>',OFF:'<span style="color:var(--rglow)">✕ OFF</span>'};
+
+function renderStatus(){
+  var xp1=gv('f-xp1')||'OK', xp2=gv('f-xp2')||'STANDBY';
+  $$('xp1-st').innerHTML=XPS[xp1]||XPS.OK;
+  $$('xp2-st').innerHTML=XPS[xp2]||XPS.STANDBY;
+  $$('br1-st').innerHTML=S[1].est==='activo'?(S[1].bri==='OK'?'<span style="color:var(--glow)">● OK</span>':'<span style="color:#7ab0ff">◉ STANDBY</span>'):'<span style="color:#7ab0ff">◉ STANDBY</span>';
+  $$('br2-st').innerHTML=S[2].est==='activo'?(S[2].bri==='OK'?'<span style="color:var(--glow)">● OK</span>':'<span style="color:#7ab0ff">◉ STANDBY</span>'):'<span style="color:#7ab0ff">◉ STANDBY</span>';
+  var ses=gv('f-ses-hoy');$$('ses-hoy').textContent=ses||'2';
+  var ins=gv('f-ins-ref');$$('ins-ref').textContent=ins||'E. Forgan';
+}
+
+/* ── EDITOR ─────────────────────────────────────────────────────────── */
+function abrirEditor(){
+  [1,2].forEach(function(n){
+    var s=S[n];
+    setEUI(n,s.est);
+    sv('f-s'+n+'-nom',s.nom); sv('f-s'+n+'-sub',s.sub);
+    sv('f-s'+n+'-ins',s.ins); sv('f-s'+n+'-alu',s.alu);
+    sv('f-s'+n+'-tema',s.tema); sv('f-s'+n+'-prx',s.prx);
+    sv('f-s'+n+'-ini',s.ini); sv('f-s'+n+'-dur',s.dur);
+    selOpt('f-s'+n+'-bri',s.bri); selOpt('f-s'+n+'-tec',s.tec);
+    sfUI(n,s.fase);
+  });
+  $$('overlay').classList.add('open');
+}
+
+function cerrar(){$$('overlay').classList.remove('open');}
+
+function setE(n,est){S[n].est=est;setEUI(n,est);}
+function setEUI(n,est){
+  $$('s'+n+'ba').classList.toggle('sel',est==='activo');
+  $$('s'+n+'be').classList.toggle('sel',est==='espera');
+  $$('s'+n+'-ha').style.display=est==='activo'?'':'none';
+  $$('s'+n+'-he').style.display=est==='espera'?'':'none';
+}
+function sf(n,idx){S[n].fase=idx;sfUI(n,idx);}
+function sfUI(n,idx){
+  var c=$$('fs'+n);if(!c)return;
+  c.querySelectorAll('.fb').forEach(function(b,i){b.classList.toggle('sel',i===idx);});
+}
+function aplicar(){
+  [1,2].forEach(function(n){
+    var s=S[n];
+    s.nom=gv('f-s'+n+'-nom'); s.sub=gv('f-s'+n+'-sub');
+    s.ins=gv('f-s'+n+'-ins'); s.alu=gv('f-s'+n+'-alu');
+    s.tema=gv('f-s'+n+'-tema'); s.prx=gv('f-s'+n+'-prx');
+    s.ini=gv('f-s'+n+'-ini'); s.dur=parseInt(gv('f-s'+n+'-dur'))||120;
+    s.bri=gv('f-s'+n+'-bri'); s.tec=gv('f-s'+n+'-tec');
+  });
+  cerrar();
+  renderCard(1); renderCard(2); renderStatus();
+  var t=$$('toast');t.classList.add('show');setTimeout(function(){t.classList.remove('show');},2400);
+}
+
+/* ── INIT ────────────────────────────────────────────────────────────── */
+renderCard(1); renderCard(2); renderStatus();
+tick(); setInterval(tick,1000);
+
+/* ── TEMA: Oscuro / Medio / Claro ────────────────────────────── */
+(function(){
+  var t = localStorage.getItem('6xsim-status-theme') || 'dark';
+  applyTheme(t, false);
+})();
+
+function setTheme(t){
+  applyTheme(t, true);
+  localStorage.setItem('6xsim-status-theme', t);
+}
+
+function applyTheme(t, animate){
+  var el = document.documentElement;
+  el.className = '';
+  if(t !== 'dark') el.classList.add(t);
+  // Highlight botón activo
+  ['dark','light','light-full'].forEach(function(m){
+    var ids = {dark:'th-dark', light:'th-light', 'light-full':'th-lf'};
+    var btn = document.getElementById(ids[m]);
+    if(!btn) return;
+    var sel = m === t;
+    btn.style.background = sel ? 'rgba(200,168,75,.35)' : 'rgba(200,168,75,.1)';
+    btn.style.borderColor = sel ? 'rgba(200,168,75,.7)' : 'rgba(200,168,75,.3)';
+  });
+}
+
+</script>
+</body>
+</html>

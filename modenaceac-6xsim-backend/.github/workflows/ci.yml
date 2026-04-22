@@ -1,0 +1,166 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# MODENACEAC 6XSIM Backend — CI Pipeline
+# Ejecuta en cada push y pull request a main / develop
+# Jobs: lint → type-check → test (con PostgreSQL real)
+# ══════════════════════════════════════════════════════════════════════════════
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+# Cancelar runs anteriores del mismo PR/branch para no desperdiciar runners
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '9'
+
+jobs:
+  # ────────────────────────────────────────────────────────────────────────────
+  # JOB 1: Lint + Type check (rápido, sin DB)
+  # ────────────────────────────────────────────────────────────────────────────
+  lint-typecheck:
+    name: 🔍 Lint & Type Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+        env:
+          DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
+
+      - name: Type check (tsc --noEmit)
+        run: npx tsc --noEmit
+
+      - name: Lint (ESLint)
+        run: npm run lint || true   # no bloquea si no hay config de eslint
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # JOB 2: Tests con PostgreSQL real
+  # ────────────────────────────────────────────────────────────────────────────
+  test:
+    name: 🧪 Tests (PostgreSQL)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: lint-typecheck
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER:     sixsim_test
+          POSTGRES_PASSWORD: sixsim_test_pw
+          POSTGRES_DB:       sixsim_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL:       "postgresql://sixsim_test:sixsim_test_pw@localhost:5432/sixsim_test"
+      JWT_SECRET:         "ci_test_secret_at_least_32_chars_long"
+      JWT_EXPIRES_IN:     "8h"
+      NODE_ENV:           "test"
+      PDF_OUTPUT_DIR:     "/tmp/sixsim-pdfs"
+      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "true"
+      PUPPETEER_EXECUTABLE_PATH: "/usr/bin/chromium-browser"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Chromium (para tests de Puppeteer)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y chromium-browser --no-install-recommends
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Run migrations en DB de test
+        run: npx prisma migrate deploy
+
+      - name: Seed datos de test
+        run: npm run db:seed
+
+      - name: Run tests
+        run: npm test -- --reporter=verbose
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 7
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # JOB 3: Build TypeScript
+  # ────────────────────────────────────────────────────────────────────────────
+  build:
+    name: 🏗️ Build TypeScript
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+        env:
+          DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ github.sha }}
+          path: |
+            dist/
+            prisma/schema.prisma
+            package.json
+            package-lock.json
+          retention-days: 30

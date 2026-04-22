@@ -1,0 +1,39 @@
+# MODENACEAC 6XSIM Backend — .gitignore
+
+# Dependencias
+node_modules/
+
+# Build
+dist/
+
+# Entorno (NUNCA subir)
+.env
+.env.local
+.env.production
+
+# PDFs generados
+pdfs/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Prisma
+prisma/migrations/
+
+# Docker
+.docker/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Tests
+coverage/

@@ -1,0 +1,77 @@
+version: '3.9'
+
+# MODENACEAC 6XSIM — Stack de desarrollo local
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: sixsim_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER:     sixsim
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-sixsim_local_2024}
+      POSTGRES_DB:       sixsim_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:     ["CMD-SHELL", "pg_isready -U sixsim -d sixsim_db"]
+      interval: 10s
+      timeout:  5s
+      retries:  5
+
+  # ── API Backend ──────────────────────────────────────────────────────────
+  api:
+    build:
+      context:    .
+      dockerfile: Dockerfile
+    container_name: sixsim_api
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV:    production
+      PORT:        3000
+      DATABASE_URL: postgresql://sixsim:${DB_PASSWORD:-sixsim_local_2024}@postgres:5432/sixsim_db
+      JWT_SECRET:  ${JWT_SECRET:-cambiar_en_produccion_256bits}
+      JWT_EXPIRES_IN: 8h
+      PDF_OUTPUT_DIR: /app/pdfs
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3001}
+      ANAC_ORG_NOMBRE:   MODENACEAC
+      ANAC_ORG_CUIT:     ${ANAC_CUIT:-30-00000000-0}
+      ANAC_CERT_NUMERO:  ${ANAC_CERT:-CERT-SIM-2024-001}
+    volumes:
+      - pdf_data:/app/pdfs
+      - log_data:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:     ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout:  10s
+      retries:  3
+
+  # ── Prisma Studio (solo en desarrollo) ───────────────────────────────────
+  prisma-studio:
+    image: node:20-alpine
+    container_name: sixsim_studio
+    working_dir: /app
+    command: npx prisma studio --port 5555 --browser none
+    ports:
+      - "5555:5555"
+    environment:
+      DATABASE_URL: postgresql://sixsim:${DB_PASSWORD:-sixsim_local_2024}@postgres:5432/sixsim_db
+    volumes:
+      - .:/app
+    depends_on:
+      - postgres
+    profiles:
+      - dev  # Solo arranca con: docker compose --profile dev up
+
+volumes:
+  postgres_data:
+  pdf_data:
+  log_data:

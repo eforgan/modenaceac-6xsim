@@ -1,0 +1,305 @@
+// prisma/schema.prisma
+// MODENACEAC 6XSIM — Esquema de base de datos PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Enums ──────────────────────────────────────────────────────────────────
+
+enum AeronaveId {
+  AW109
+  R44
+}
+
+enum Rol {
+  PILOTO
+  INSTRUCTOR
+  OPERADOR
+  ADMIN
+  DIRECCION
+  ANAC
+}
+
+enum EstadoSesion {
+  EN_CURSO
+  COMPLETADA
+  ABORTADA
+  CANCELADA
+}
+
+enum ResultadoManiobra {
+  AS
+  S
+  SB
+  NA
+}
+
+enum TipoReserva {
+  VUELO
+  DEMO
+  MANT
+  CAPACITACION
+}
+
+enum EstadoReserva {
+  PENDIENTE
+  CONFIRMADA
+  EN_CURSO
+  COMPLETADA
+  CANCELADA
+}
+
+enum EstadoMantenimiento {
+  PENDIENTE
+  EN_PROGRESO
+  COMPLETADA
+  VENCIDA
+}
+
+enum FrecuenciaMantenimiento {
+  DIARIA
+  SEMANAL
+  MENSUAL
+  TRIMESTRAL
+  SEMESTRAL
+  ANUAL
+  POR_HORAS
+}
+
+// ── Usuarios / Personal ────────────────────────────────────────────────────
+
+model Usuario {
+  id              String    @id @default(uuid())
+  email           String    @unique
+  passwordHash    String
+  nombre          String
+  apellido        String
+  rol             Rol
+  activo          Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  sesionesComoInstructor Sesion[] @relation("Instructor")
+  reservasComoInstructor Reserva[] @relation("InstructorReserva")
+
+  @@map("usuarios")
+}
+
+model Piloto {
+  id              String    @id @default(uuid())
+  nombre          String
+  apellido        String
+  licencia        String    @unique
+  dni             String?
+  email           String?
+  telefono        String?
+  // Habilitaciones
+  habAW109        Boolean   @default(false)
+  habR44          Boolean   @default(false)
+  habIFR          Boolean   @default(false)
+  // Psicofísico
+  psicofisicoVto  DateTime?
+  // Estadísticas
+  totalHoras      Float     @default(0)
+  totalSesiones   Int       @default(0)
+  activo          Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  sesiones        Sesion[]
+  reservas        Reserva[]
+
+  @@map("pilotos")
+}
+
+// ── Simuladores ────────────────────────────────────────────────────────────
+
+model Simulador {
+  id              String      @id @default(uuid())
+  nombre          String
+  aeronave        AeronaveId
+  xplaneVersion   String      @default("XP11")
+  xplaneIp        String
+  operativo       Boolean     @default(true)
+  ultimaRevision  DateTime?
+  notas           String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  sesiones        Sesion[]
+  reservas        Reserva[]
+  tareas          TareaMantenimiento[]
+
+  @@map("simuladores")
+}
+
+// ── Sesiones de vuelo ──────────────────────────────────────────────────────
+
+model Sesion {
+  id              String          @id @default(uuid())
+  pilotoId        String
+  instructorId    String
+  simuladorId     String
+  // Configuración
+  icao            String
+  horaLocal       String
+  fecha           DateTime
+  // Meteorología
+  vientoDirGrados Int             @default(0)
+  vientoKts       Int             @default(0)
+  visibilidadSm   Float           @default(10)
+  turbulencia     Int             @default(0)
+  tipoNubes       String          @default("CAVOK")
+  techoPies       Int             @default(5000)
+  temperaturaC    Int             @default(20)
+  // Tiempos
+  estado          EstadoSesion    @default(EN_CURSO)
+  horaInicio      DateTime
+  horaFin         DateTime?
+  duracionSeg     Int?
+  // Evaluación
+  evaluacionGlobal ResultadoManiobra?
+  observaciones   String?
+  firmaBase64     String?
+  // ANAC
+  reportePdfUrl   String?
+  exportadoAnac   Boolean         @default(false)
+  exportadoAnacAt DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  piloto          Piloto          @relation(fields: [pilotoId], references: [id])
+  instructor      Usuario         @relation("Instructor", fields: [instructorId], references: [id])
+  simulador       Simulador       @relation(fields: [simuladorId], references: [id])
+  evaluaciones    EvalManiobra[]
+  fallasUsadas    FallaRegistro[]
+  reserva         Reserva?        @relation(fields: [reservaId], references: [id])
+  reservaId       String?
+
+  @@index([pilotoId])
+  @@index([simuladorId])
+  @@index([fecha])
+  @@map("sesiones")
+}
+
+model EvalManiobra {
+  id              String              @id @default(uuid())
+  sesionId        String
+  maniobraId      String
+  nombre          String
+  resultado       ResultadoManiobra
+  observaciones   String?
+  createdAt       DateTime            @default(now())
+
+  sesion          Sesion              @relation(fields: [sesionId], references: [id], onDelete: Cascade)
+
+  @@index([sesionId])
+  @@map("eval_maniobras")
+}
+
+model FallaRegistro {
+  id              String    @id @default(uuid())
+  sesionId        String
+  fallaId         String
+  nombre          String
+  dataref         String
+  sistema         String
+  aeronave        AeronaveId
+  inyectadaEn     DateTime  @default(now())
+  limpiadaEn      DateTime?
+
+  sesion          Sesion    @relation(fields: [sesionId], references: [id], onDelete: Cascade)
+
+  @@index([sesionId])
+  @@map("fallas_registro")
+}
+
+// ── Reservas ───────────────────────────────────────────────────────────────
+
+model Reserva {
+  id              String          @id @default(uuid())
+  simuladorId     String
+  pilotoId        String?
+  instructorId    String?
+  tipo            TipoReserva
+  estado          EstadoReserva   @default(PENDIENTE)
+  fecha           DateTime
+  horaInicio      String          // 'HH:MM'
+  horaFin         String          // 'HH:MM'
+  tema            String?
+  notas           String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  simulador       Simulador       @relation(fields: [simuladorId], references: [id])
+  piloto          Piloto?         @relation(fields: [pilotoId], references: [id])
+  instructor      Usuario?        @relation("InstructorReserva", fields: [instructorId], references: [id])
+  sesiones        Sesion[]
+
+  @@index([fecha])
+  @@index([simuladorId])
+  @@map("reservas")
+}
+
+// ── Mantenimiento ──────────────────────────────────────────────────────────
+
+model TareaMantenimiento {
+  id              String                  @id @default(uuid())
+  simuladorId     String?
+  titulo          String
+  descripcion     String
+  frecuencia      FrecuenciaMantenimiento
+  critica         Boolean                 @default(false)
+  estado          EstadoMantenimiento     @default(PENDIENTE)
+  proximaFecha    DateTime?
+  proximasHoras   Float?
+  ultimaFecha     DateTime?
+  ultimoResponsable String?
+  notas           String?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  simulador       Simulador?              @relation(fields: [simuladorId], references: [id])
+  historial       HistorialMantenimiento[]
+
+  @@index([estado])
+  @@index([proximaFecha])
+  @@map("tareas_mantenimiento")
+}
+
+model HistorialMantenimiento {
+  id              String    @id @default(uuid())
+  tareaId         String
+  realizadoEn     DateTime  @default(now())
+  responsable     String
+  descripcion     String
+  horasMaquina    Float?
+
+  tarea           TareaMantenimiento @relation(fields: [tareaId], references: [id], onDelete: Cascade)
+
+  @@index([tareaId])
+  @@map("historial_mantenimiento")
+}
+
+// ── Log técnico ────────────────────────────────────────────────────────────
+
+model LogTecnico {
+  id              String    @id @default(uuid())
+  simuladorId     String?
+  tipo            String    // INCIDENTE, FALLA, ALERTA, INFO
+  descripcion     String
+  operador        String
+  resolucion      String?
+  resueltoEn      DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([simuladorId])
+  @@index([createdAt])
+  @@map("log_tecnico")
+}

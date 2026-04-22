@@ -1,0 +1,157 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# MODENACEAC 6XSIM Backend — Release
+# Crea un release automático cuando se hace push de un tag v*.*.*
+# También permite crear releases manuales
+# ══════════════════════════════════════════════════════════════════════════════
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'   # v4.0.0, v4.1.0, etc.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Versión del release (ej: 4.1.0)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Es un pre-release?'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  REGISTRY:    ghcr.io
+  IMAGE_NAME:  ${{ github.repository_owner }}/modenaceac-6xsim-backend
+
+jobs:
+  release:
+    name: 📦 Crear Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # Necesario para generar changelog
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+        env:
+          DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
+
+      - name: Build
+        run: npm run build
+
+      # ── Determinar versión ──────────────────────────────────────────────────
+      - name: Determinar versión
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="v${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Versión del release: $VERSION"
+
+      # ── Generar changelog desde git log ────────────────────────────────────
+      - name: Generar changelog
+        id: changelog
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -n "$PREV_TAG" ]; then
+            RANGE="${PREV_TAG}..HEAD"
+            echo "Cambios desde $PREV_TAG:"
+          else
+            RANGE="HEAD"
+            echo "Primer release — todos los commits:"
+          fi
+
+          CHANGELOG=$(git log $RANGE --pretty=format:"- %s (%h)" \
+            --no-merges \
+            | grep -v "^- chore\|^- style\|^- docs" \
+            | head -40)
+
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      # ── Build Docker image de release ──────────────────────────────────────
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login a GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build y Push imagen de release
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          cache-from: type=gha
+          cache-to:   type=gha,mode=max
+
+      # ── Crear GitHub Release ────────────────────────────────────────────────
+      - name: Crear GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name:   ${{ steps.version.outputs.version }}
+          name:       "MODENACEAC 6XSIM Backend ${{ steps.version.outputs.version }}"
+          prerelease: ${{ github.event.inputs.prerelease || false }}
+          body: |
+            # 🚁 MODENACEAC 6XSIM Backend ${{ steps.version.outputs.version }}
+
+            **Fecha:** ${{ github.run_started_at }}
+            **Commit:** `${{ github.sha }}`
+
+            ## Cambios en esta versión
+
+            ${{ steps.changelog.outputs.changelog }}
+
+            ## Imagen Docker
+
+            ```bash
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
+            ```
+
+            ## Inicio rápido
+
+            ```bash
+            cp .env.example .env   # editar DATABASE_URL y JWT_SECRET
+            docker compose up -d
+            curl http://localhost:3000/health
+            ```
+
+            ## Credenciales de seed
+
+            | Rol | Email | Password |
+            |-----|-------|----------|
+            | ADMIN | admin@modenaceac.ar | Admin6XSIM2024! |
+            | INSTRUCTOR | e.forgan@modenaceac.ar | Instructor2024! |
+            | OPERADOR | op@modenaceac.ar | Operador2024! |
+
+            ---
+            *MODENACEAC · Departamento 6XSIM · Eduardo Forgan*

@@ -1,0 +1,83 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# MODENACEAC 6XSIM Backend — Security & Dependencies
+# Ejecuta cada lunes y en cada push a main
+# ══════════════════════════════════════════════════════════════════════════════
+name: Security Audit
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'   # Lunes a las 06:00 UTC
+  push:
+    branches: [main]
+    paths:
+      - 'package*.json'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: 🔐 npm audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Audit de seguridad (high + critical)
+        run: npm audit --audit-level=high
+        continue-on-error: true
+
+      - name: Generar reporte de audit
+        run: |
+          npm audit --json > audit-report.json || true
+          echo "## 🔐 Resultado del audit de seguridad" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
+          cat audit-report.json | python3 -c "
+          import json,sys
+          d=json.load(sys.stdin)
+          meta=d.get('metadata',{})
+          vuln=meta.get('vulnerabilities',{})
+          print('Vulnerabilidades:')
+          for k,v in vuln.items():
+              if v>0: print(f'  {k}: {v}')
+          print(f'Total deps: {meta.get(\"dependencies\",{}).get(\"total\",\"?\")}')
+          " 2>/dev/null || echo "Ver artefacto para detalles"
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-report-${{ github.run_id }}
+          path: audit-report.json
+          retention-days: 30
+
+  # Verificar que las dependencias están actualizadas
+  outdated:
+    name: 📦 Dependencias desactualizadas
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Verificar dependencias outdated
+        run: |
+          echo "## 📦 Dependencias desactualizadas" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          npm outdated || true
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        continue-on-error: true

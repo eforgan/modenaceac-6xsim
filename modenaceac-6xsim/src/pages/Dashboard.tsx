@@ -3,22 +3,7 @@ import { Badge } from '../components/Badge';
 import { Card } from '../components/Card';
 import { dashboardApi, type DashboardData } from '../services/api';
 
-const PB: Record<string, string> = { VIGENTE: 'bo', POR_VENCER: 'bpv', VENCIDO: 'bvn' };
-const TD_MAP: Record<string, { c: string; i: string }> = {
-  MEJORA:    { c: '#27500A', i: '↑ MEJORA' },
-  ESTABLE:   { c: '#5F5E5A', i: '→ ESTABLE' },
-  DETERIORO: { c: '#791F1F', i: '↓ DETERIORO' },
-};
-
 const formatHoras = (h: number) => h >= 1 ? `${Math.round(h * 10) / 10}h` : `${Math.round(h * 60)}min`;
-
-function psicoEstado(vto: string | null): 'VIGENTE' | 'POR_VENCER' | 'VENCIDO' {
-  if (!vto) return 'VIGENTE';
-  const dias = Math.round((new Date(vto).getTime() - Date.now()) / 86400000);
-  if (dias < 0)  return 'VENCIDO';
-  if (dias < 30) return 'POR_VENCER';
-  return 'VIGENTE';
-}
 
 export const Dashboard: React.FC = () => {
   const [data, setData]       = useState<DashboardData | null>(null);

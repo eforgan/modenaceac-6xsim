@@ -421,7 +421,7 @@ class LuaBridgeService {
       if (elapsed > PONG_TIMEOUT_MS) {
         console.warn('[Bridge] Watchdog: sin pong desde', elapsed, 'ms');
         this.actualizarEstado({ conexion: 'DESCONECTADO' });
-        this.onConexion?.(this.estado);
+        this.scheduleReconnect();
       }
     }, 2_000);
   }
@@ -457,19 +457,19 @@ class LuaBridgeService {
 
   /** Crear una Promise con timeout para esperar un ACK */
   private makeAckPromise<T>(
-    holder: { pending: PendingAck<T> | null },
-    setter: (p: PendingAck<T>) => void,
+    pending: PendingAck<T> | null,
+    setter: (p: PendingAck<T> | null) => void,
     timeoutMs = 3_000,
   ): Promise<T> {
     // Cancelar ACK previo si existía
-    if (holder.pending) {
-      clearTimeout(holder.pending.timer);
-      holder.pending.reject(new Error('Superado por nuevo comando'));
-      setter(null as any);
+    if (pending) {
+      clearTimeout(pending.timer);
+      pending.reject(new Error('Superado por nuevo comando'));
+      setter(null);
     }
     return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => {
-        setter(null as any);
+        setter(null);
         reject(new Error('Timeout esperando ACK'));
       }, timeoutMs);
       setter({ resolve, reject, timer });
@@ -515,9 +515,8 @@ class LuaBridgeService {
       }
     }
 
-    const holder = { pending: this.pendingFallaAck };
     return this.makeAckPromise<boolean>(
-      holder,
+      this.pendingFallaAck,
       (p) => { this.pendingFallaAck = p; },
     );
   }
@@ -548,9 +547,8 @@ class LuaBridgeService {
       temperatura_c:  params.temperatura_c,
       qnh_inhg:       params.qnh_inhg,
     });
-    const holder = { pending: this.pendingMeteoAck };
     return this.makeAckPromise<boolean>(
-      holder,
+      this.pendingMeteoAck,
       (p) => { this.pendingMeteoAck = p; },
     );
   }
@@ -558,9 +556,8 @@ class LuaBridgeService {
   /** Teletransportar al aeródromo ICAO */
   setPosicion(icao: string, agl_m?: number): Promise<string> {
     this.send({ type: 'set_posicion', icao, agl_m: agl_m ?? 50 });
-    const holder = { pending: this.pendingPosicionAck };
     return this.makeAckPromise<string>(
-      holder,
+      this.pendingPosicionAck,
       (p) => { this.pendingPosicionAck = p; },
     );
   }
@@ -591,9 +588,8 @@ class LuaBridgeService {
     log_interval?: number;
   }): Promise<ConfigAck> {
     this.send({ type: 'set_config', ...params });
-    const holder = { pending: this.pendingConfigAck };
     return this.makeAckPromise<ConfigAck>(
-      holder,
+      this.pendingConfigAck,
       (p) => { this.pendingConfigAck = p; },
     );
   }
@@ -604,9 +600,8 @@ class LuaBridgeService {
    */
   getFallas(): Promise<FallasEstado> {
     this.send({ type: 'get_fallas' });
-    const holder = { pending: this.pendingFallasAck };
     return this.makeAckPromise<FallasEstado>(
-      holder,
+      this.pendingFallasAck,
       (p) => { this.pendingFallasAck = p; },
       5_000,
     );
@@ -618,9 +613,8 @@ class LuaBridgeService {
    */
   getInfo(): Promise<BridgeInfo> {
     this.send({ type: 'get_info' });
-    const holder = { pending: this.pendingInfoAck };
     return this.makeAckPromise<BridgeInfo>(
-      holder,
+      this.pendingInfoAck,
       (p) => { this.pendingInfoAck = p; },
       5_000,
     );
@@ -711,7 +705,22 @@ class LuaBridgeService {
   // ══════════════════════════════════════════════════════════════════════════
 
   private actualizarEstado(parcial: Partial<EstadoBridge>) {
+    const prevConexion = this.estado.conexion;
+    const prevFallas = this.estado.n_fallas_xp;
+    const prevLatencia = this.estado.latencia_ms;
+
     this.estado = { ...this.estado, ...parcial };
+
+    if (
+      this.estado.conexion !== prevConexion ||
+      this.estado.n_fallas_xp !== prevFallas ||
+      this.estado.latencia_ms !== prevLatencia ||
+      parcial.xp_version !== undefined ||
+      parcial.aeronave_xp !== undefined ||
+      parcial.bridge_version !== undefined
+    ) {
+      this.onConexion?.(this.estado);
+    }
   }
 
   /** Estado actual del bridge */

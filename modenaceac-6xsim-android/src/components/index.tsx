@@ -12,8 +12,8 @@ export function Card({ children, style }: { children: ReactNode; style?: ViewSty
   return <View style={[styles.card, style]}>{children}</View>;
 }
 
-export function CardTitle({ children }: { children: string }) {
-  return <Text style={styles.cardTitle}>{children}</Text>;
+export function CardTitle({ children, style }: { children: string; style?: TextStyle }) {
+  return <Text style={[styles.cardTitle, style]}>{children}</Text>;
 }
 
 // ── Badge ─────────────────────────────────────────────────────────────────

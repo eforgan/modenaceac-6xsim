@@ -16,10 +16,6 @@ function getFechaTab(offset: number) {
   return d;
 }
 
-function formatFechaTab(d: Date) {
-  return d.toLocaleDateString('es-AR', { weekday: 'short', day: '2-digit', month: 'short' }).toUpperCase();
-}
-
 function isSameFecha(reserva: Reserva, d: Date) {
   const r = new Date(reserva.fecha);
   return r.getFullYear() === d.getFullYear() && r.getMonth() === d.getMonth() && r.getDate() === d.getDate();

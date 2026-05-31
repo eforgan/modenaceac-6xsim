@@ -195,7 +195,6 @@ export default function SesionScreen() {
 
         {/* ══ FALLAS ACTIVAS ══ */}
         <FallasActivasPanel
-          fallasIds={fallasIds}
           historial={historialFallas}
           onDesactivar={desactivarFalla}
           showHistorial={showHistorial}
@@ -301,9 +300,8 @@ export default function SesionScreen() {
 
 // ── Panel de fallas activas ────────────────────────────────────────────────
 function FallasActivasPanel({
-  fallasIds, historial, onDesactivar, showHistorial, onToggleHistorial,
+  historial, onDesactivar, showHistorial, onToggleHistorial,
 }: {
-  fallasIds:        Set<string>;
   historial:        FallaRegistrada[];
   onDesactivar:     (id: string, dr: string, nombre?: string, sistema?: string) => Promise<boolean>;
   showHistorial:    boolean;

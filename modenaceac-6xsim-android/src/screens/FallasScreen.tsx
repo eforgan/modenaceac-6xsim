@@ -34,15 +34,15 @@ export default function FallasScreen() {
     });
   }
 
-  function onToggleFalla(falla: FallaXPlane) {
+  function onToggleFalla(falla: FallaXPlane, sistema: string) {
     if (!conectado) {
       Alert.alert('Sin conexión', 'Conectar X-Plane antes de inyectar fallas.');
       return;
     }
     if (fallasActivasIds.has(falla.id)) {
-      desactivarFalla(falla.id, falla.dataref);
+      desactivarFalla(falla.id, falla.dataref, falla.nombre, sistema);
     } else {
-      activarFalla(falla.id, falla.dataref);
+      activarFalla(falla.id, falla.dataref, falla.nombre, sistema);
     }
   }
 
@@ -141,7 +141,7 @@ export default function FallasScreen() {
                         </View>
                         <Toggle
                           value={activa}
-                          onToggle={() => onToggleFalla(falla)}
+                          onToggle={() => onToggleFalla(falla, sis.sistema)}
                         />
                       </View>
                     );
@@ -168,7 +168,8 @@ export default function FallasScreen() {
                   { text: 'Cancelar', style: 'cancel' },
                   { text: 'Inyectar', style: 'destructive', onPress: () => {
                     const f1 = aeronave === 'AW109' ? FALLAS_AW109[0].fallas[0] : FALLAS_R44[0].fallas[0];
-                    activarFalla(f1.id, f1.dataref);
+                    const sisNombre = aeronave === 'AW109' ? FALLAS_AW109[0].sistema : FALLAS_R44[0].sistema;
+                    activarFalla(f1.id, f1.dataref, f1.nombre, sisNombre);
                   }},
                 ],
               );
@@ -185,7 +186,7 @@ export default function FallasScreen() {
               if (!conectado) return;
               const idx = aeronave === 'AW109' ? 2 : 1;
               const sis = sistemas[idx];
-              sis.fallas.slice(0, 1).forEach((f) => activarFalla(f.id, f.dataref));
+              sis.fallas.slice(0, 1).forEach((f) => activarFalla(f.id, f.dataref, f.nombre, sis.sistema));
             }}
             activeOpacity={0.8}
           >
@@ -199,7 +200,7 @@ export default function FallasScreen() {
               if (!conectado) return;
               const idx = aeronave === 'AW109' ? 3 : 3;
               const sis = sistemas[idx];
-              sis.fallas.slice(0, 1).forEach((f) => activarFalla(f.id, f.dataref));
+              sis.fallas.slice(0, 1).forEach((f) => activarFalla(f.id, f.dataref, f.nombre, sis.sistema));
             }}
             activeOpacity={0.8}
           >

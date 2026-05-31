@@ -51,4 +51,4 @@ USER sixsim
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss --skip-generate && node dist/server.js"]
+CMD ["node", "dist/server.js"]

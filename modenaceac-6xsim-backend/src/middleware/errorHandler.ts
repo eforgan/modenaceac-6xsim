@@ -40,7 +40,7 @@ export function errorHandler(
   // Error genérico
   const status = (err as any).status ?? 500;
   res.status(status).json({
-    error: status === 500 ? 'Error interno del servidor' : err.message,
+    error: err.message ?? 'Error interno del servidor',
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
   });
 }

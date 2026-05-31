@@ -138,7 +138,7 @@ async function main() {
         habAW109:       false,
         habR44:         true,
         habIFR:         false,
-        psicofisicoVto: new Date('2026-05-20'),  // Por vencer pronto ⚠
+        psicofisicoVto: new Date('2026-06-15'),  // Por vencer pronto ⚠
         totalHoras:     54.0,
         totalSesiones:  9,
       },

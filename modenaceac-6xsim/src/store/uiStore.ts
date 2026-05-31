@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { auth } from '../services/api';
 
 interface TelemetryData {
   alt: number;
@@ -18,12 +19,14 @@ interface UiState {
   manSel: string | null;
   evals: Record<string, string>;
   td: TelemetryData;
+  isAuthenticated: boolean;
   setTheme: (theme: 'light' | 'dark') => void;
   startTimer: () => void;
   stopTimer: () => void;
   setManSel: (id: string | null) => void;
   setEval: (manId: string, result: string) => void;
   resetEvals: () => void;
+  logout: () => void;
 }
 
 export const useUiStore = create<UiState>((set, get) => ({
@@ -33,8 +36,15 @@ export const useUiStore = create<UiState>((set, get) => ({
   manSel: null,
   evals: {},
   td: { alt: 1180, vvi: -80, ias: 42, pitch: -1.8, roll: 0.5, hdg: 248, rpm: 6380, rotor: 322 },
+  isAuthenticated: auth.isLoggedIn(),
 
   setTheme: (theme) => set({ theme }),
+
+  logout: () => {
+    auth.clear();
+    set({ isAuthenticated: false });
+    window.location.href = '/login';
+  },
 
   startTimer: () => {
     const { timerInt } = get();

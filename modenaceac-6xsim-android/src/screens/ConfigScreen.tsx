@@ -25,7 +25,9 @@ export default function ConfigScreen() {
   const conectado  = useSesionStore((s) => s.conectado);
   const setConn    = useSesionStore((s) => s.setConectado);
   const setTelem   = useSesionStore((s) => s.setTelemetria);
-  const [ipInput,  setIpInput]  = useState(cfg.xplane_ip);
+  const [ipInput,      setIpInput]      = useState(cfg.xplane_ip);
+  const [apiIpInput,   setApiIpInput]   = useState(cfg.api_ip);
+  const [apiTokenInput,setApiTokenInput]= useState(cfg.api_token);
   const [pilInput, setPilInput] = useState(cfg.piloto_nombre);
   const [licInput, setLicInput] = useState(cfg.piloto_licencia);
   const [insInput, setInsInput] = useState(cfg.instructor_nombre);
@@ -37,23 +39,59 @@ export default function ConfigScreen() {
     return () => luaBridge.destroy();
   }, []);
 
-  function aplicarConfig() {
+  async function aplicarConfig() {
     cfg.setXPlaneIP(ipInput);
+    cfg.setApiIP(apiIpInput);
+    cfg.setApiToken(apiTokenInput);
     cfg.setPiloto(pilInput, licInput);
     cfg.setInstructor(insInput);
-    luaBridge.destroy();
-    luaBridge.init(ipInput, setTelem, setConn);
-    luaBridge.setHora(cfg.hora_local);
-    luaBridge.setPosicion(cfg.icao);
-    luaBridge.setMeteo({
-      viento_dir:     cfg.meteo.viento_dir,
-      viento_kts:     cfg.meteo.viento_kts,
-      visibilidad_sm: cfg.meteo.visibilidad_sm,
-      turbulencia:    cfg.meteo.turbulencia,
-      temperatura_c:  cfg.meteo.temperatura_c,
-    });
-    Alert.alert('Configuración aplicada', `X-Plane en ${ipInput}\nAeronave: ${cfg.aeronave}\nICAO: ${cfg.icao}`);
+
+    if (cfg.xplane_ip !== ipInput) {
+      luaBridge.cambiarIP(ipInput);
+    }
+
+    if (!conectado) {
+      Alert.alert(
+        'Configuración local guardada',
+        'Los parámetros se guardaron localmente en la tablet.\n\n⚠️ X-Plane está DESCONECTADO actualmente. La sincronización se aplicará automáticamente al restablecer el enlace UDP.'
+      );
+      return;
+    }
+
+    try {
+      const res = await luaBridge.aplicarConfigSesion({
+        aeronave: cfg.aeronave,
+        icao: cfg.icao,
+        hora_local: cfg.hora_local,
+        meteo: {
+          viento_dir:     cfg.meteo.viento_dir,
+          viento_kts:     cfg.meteo.viento_kts,
+          visibilidad_sm: cfg.meteo.visibilidad_sm,
+          turbulencia:    cfg.meteo.turbulencia,
+          temperatura_c:  cfg.meteo.temperatura_c,
+          qnh_inhg:       cfg.meteo.qnh_inhg,
+        }
+      });
+
+      if (res.ok) {
+        Alert.alert(
+          'Configuración Aplicada',
+          `Sincronización completa con X-Plane:\n• Aeronave: ${cfg.aeronave}\n• Escenario: ${cfg.icao}\n• Hora: ${cfg.hora_local} Hs\n• Viento: ${cfg.meteo.viento_dir}° / ${cfg.meteo.viento_kts} kts\n• QNH: ${cfg.meteo.qnh_inhg.toFixed(2)} inHg`
+        );
+      } else {
+        Alert.alert(
+          'Configuración Parcial',
+          `Se enviaron los comandos pero se registraron algunos fallos:\n${res.errores.join('\n')}`
+        );
+      }
+    } catch (err: any) {
+      Alert.alert(
+        'Error de sincronización',
+        `No se pudo aplicar la configuración en el simulador:\n${err.message}`
+      );
+    }
   }
+
 
   return (
     <ScrollView style={styles.screen} keyboardShouldPersistTaps="handled">
@@ -106,6 +144,32 @@ export default function ConfigScreen() {
             keyboardType="numeric"
           />
           <Text style={styles.inputHint}>Puerto comandos: 49002 · Puerto telemetría: 49001</Text>
+        </Card>
+
+        {/* Conexión Backend */}
+        <SectionHeader>Conexión Backend</SectionHeader>
+        <Card>
+          <CardTitle>IP del servidor backend</CardTitle>
+          <TextInput
+            style={styles.input}
+            value={apiIpInput}
+            onChangeText={setApiIpInput}
+            placeholder="192.168.1.100"
+            placeholderTextColor={Colors.grayMid}
+            keyboardType="numeric"
+          />
+          <Text style={styles.inputHint}>Puerto: 3000 · Requerido para sincronizar sesiones</Text>
+          <CardTitle>Token de autenticación</CardTitle>
+          <TextInput
+            style={styles.input}
+            value={apiTokenInput}
+            onChangeText={setApiTokenInput}
+            placeholder="Bearer token JWT (obtenido del panel web)"
+            placeholderTextColor={Colors.grayMid}
+            secureTextEntry
+            autoCapitalize="none"
+          />
+          <Text style={styles.inputHint}>Iniciar sesión en el panel web y copiar el token generado</Text>
         </Card>
 
         {/* Escenario */}
@@ -186,6 +250,13 @@ export default function ConfigScreen() {
             value={cfg.meteo.temperatura_c}
             onValue={(v) => cfg.setMeteo({ temperatura_c: v })}
           />
+          <Row label={`QNH (Presión Barométrica): ${cfg.meteo.qnh_inhg.toFixed(2)} inHg`} value="" />
+          <SliderRow
+            min={28.00} max={32.00} step={0.01}
+            value={cfg.meteo.qnh_inhg}
+            onValue={(v) => cfg.setMeteo({ qnh_inhg: parseFloat(v.toFixed(2)) })}
+          />
+
           <CardTitle>Tipo de nubes</CardTitle>
           <View style={styles.nubesRow}>
             {NUBES.map((n) => (

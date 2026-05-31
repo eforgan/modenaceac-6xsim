@@ -10,6 +10,7 @@ import path from 'path';
 import { errorHandler } from './middleware/errorHandler';
 import { authMiddleware } from './middleware/auth';
 import { logger } from './utils/logger';
+import { prisma } from './utils/prisma';
 
 // Routers
 import sesionesRouter     from './routes/sesiones';
@@ -90,6 +91,47 @@ app.use('/pdfs', express.static(path.resolve(process.env.PDF_OUTPUT_DIR ?? './pd
 
 // ── Rutas públicas ────────────────────────────────────────────────────────
 app.use('/api/auth', authRouter);
+
+app.get('/api/public/status', async (_req, res, next) => {
+  try {
+    const hoy = new Date();
+    const startOfToday = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+    const endOfToday = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 23, 59, 59);
+
+    const [simuladores, reservasHoy, sesionesActivas] = await Promise.all([
+      prisma.simulador.findMany({
+        orderBy: { aeronave: 'asc' },
+      }),
+      prisma.reserva.findMany({
+        where: {
+          fecha: { gte: startOfToday, lte: endOfToday },
+          estado: { in: ['PENDIENTE', 'CONFIRMADA', 'EN_CURSO'] }
+        },
+        orderBy: { horaInicio: 'asc' },
+        include: {
+          piloto: { select: { nombre: true, apellido: true } },
+          instructor: { select: { nombre: true, apellido: true } }
+        }
+      }),
+      prisma.sesion.findMany({
+        where: { estado: 'EN_CURSO' },
+        include: {
+          piloto: { select: { nombre: true, apellido: true } },
+          instructor: { select: { nombre: true, apellido: true } },
+          simulador: true
+        }
+      })
+    ]);
+
+    res.json({
+      simuladores,
+      reservasHoy,
+      sesionesActivas
+    });
+  } catch (err) {
+    next(err);
+  }
+});
 
 // ── Rutas protegidas ──────────────────────────────────────────────────────
 app.use('/api/dashboard',    authMiddleware, dashboardRouter);

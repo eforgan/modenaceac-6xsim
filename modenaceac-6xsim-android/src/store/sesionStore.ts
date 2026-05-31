@@ -35,6 +35,7 @@ interface SesionState {
   // ── Estado del bridge ──────────────────────────────────────────────────
   estadoBridge:      EstadoBridge | null;
   bridgeInfo:        BridgeInfo   | null;
+  conectado:         boolean;
 
   // ── Fallas ────────────────────────────────────────────────────────────
   fallasActivasIds:   Set<string>;
@@ -70,6 +71,7 @@ interface SesionState {
   // ── Acciones — Telemetría y bridge ────────────────────────────────────
   setTelemetria:   (snap: TelemetriaSnapshot | TelemetriaExtendida) => void;
   setEstadoBridge: (estado: EstadoBridge) => void;
+  setConectado:    (estado: EstadoBridge) => void;
   setBridgeInfo:   (info: BridgeInfo) => void;
 
   // ── Acciones — Fallas con Bridge v2.0 ────────────────────────────────
@@ -106,7 +108,7 @@ interface SesionState {
 const ESTADO_INICIAL: Pick<SesionState,
   'sesion' | 'estado' | 'timerSegundos' | 'telemetria' | 'telemExtendida' |
   'tieneTelExtendida' | 'estadoBridge' | 'bridgeInfo' | 'fallasActivasIds' |
-  'fallasActivasCount' | 'historialFallas' | 'ultimoAck'
+  'fallasActivasCount' | 'historialFallas' | 'ultimoAck' | 'conectado'
 > = {
   sesion:             null,
   estado:             'IDLE',
@@ -120,6 +122,7 @@ const ESTADO_INICIAL: Pick<SesionState,
   fallasActivasCount: 0,
   historialFallas:    [],
   ultimoAck:          null,
+  conectado:          false,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -144,6 +147,17 @@ export const useSesionStore = create<SesionState>()((set, get) => ({
 
   setEstadoBridge: (estado) => {
     set({ estadoBridge: estado });
+    // Si acaba de conectarse, sincronizar fallas
+    if (estado.conexion === 'CONECTADO') {
+      setTimeout(() => get().sincronizarFallas(), 800);
+    }
+  },
+
+  setConectado: (estado) => {
+    set({
+      estadoBridge: estado,
+      conectado:    estado.conexion === 'CONECTADO',
+    });
     // Si acaba de conectarse, sincronizar fallas
     if (estado.conexion === 'CONECTADO') {
       setTimeout(() => get().sincronizarFallas(), 800);

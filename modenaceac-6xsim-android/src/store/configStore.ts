@@ -11,6 +11,9 @@ export interface ConfigState {
   // Instrucción
   aeronave:          AeronaveId;
   xplane_ip:         string;
+  // IP y credenciales del backend (separado de X-Plane)
+  api_ip:            string;
+  api_token:         string;
   icao:              string;
   hora_local:        string;
   piloto_nombre:     string;
@@ -21,6 +24,8 @@ export interface ConfigState {
   // Acciones
   setAeronave:       (a: AeronaveId) => void;
   setXPlaneIP:       (ip: string) => void;
+  setApiIP:          (ip: string) => void;
+  setApiToken:       (token: string) => void;
   setIcao:           (icao: string) => void;
   setHora:           (h: string) => void;
   setPiloto:         (nombre: string, licencia: string) => void;
@@ -38,11 +43,14 @@ const meteoDefault: ConfigMeteo = {
   tipo_nubes:     'CAVOK',
   techo_ft:       5000,
   temperatura_c:  18,
+  qnh_inhg:       29.92,
 };
 
 export const useConfigStore = create<ConfigState>((set, get) => ({
   aeronave:          'AW109',
   xplane_ip:         '192.168.1.100',
+  api_ip:            '192.168.1.100',
+  api_token:         '',
   icao:              'SAEZ',
   hora_local:        '10:00',
   piloto_nombre:     '',
@@ -52,6 +60,8 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
 
   setAeronave:   (a)    => { set({ aeronave: a }); get().guardar(); },
   setXPlaneIP:   (ip)   => { set({ xplane_ip: ip }); get().guardar(); },
+  setApiIP:      (ip)   => { set({ api_ip: ip }); get().guardar(); },
+  setApiToken:   (token) => { set({ api_token: token }); get().guardar(); },
   setIcao:       (icao) => { set({ icao }); get().guardar(); },
   setHora:       (h)    => { set({ hora_local: h }); get().guardar(); },
   setPiloto:     (n, l) => { set({ piloto_nombre: n, piloto_licencia: l }); get().guardar(); },
@@ -74,8 +84,8 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   guardar: async () => {
     try {
       const { cargar: _c, guardar: _g, setAeronave: _sa, setXPlaneIP: _si,
-              setIcao: _ii, setHora: _sh, setPiloto: _sp, setInstructor: _st,
-              setMeteo: _sm, ...data } = get();
+              setApiIP: _ai, setApiToken: _at, setIcao: _ii, setHora: _sh,
+              setPiloto: _sp, setInstructor: _st, setMeteo: _sm, ...data } = get();
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch { /* ignorar errores de storage */ }
   },

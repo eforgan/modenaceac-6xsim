@@ -1,155 +1,172 @@
-import React from 'react';
-import { PIL, TD, PB } from '../data/mock';
+import React, { useEffect, useState } from 'react';
 import { Badge } from '../components/Badge';
 import { Card } from '../components/Card';
+import { dashboardApi, type DashboardData } from '../services/api';
+
+const PB: Record<string, string> = { VIGENTE: 'bo', POR_VENCER: 'bpv', VENCIDO: 'bvn' };
+const TD_MAP: Record<string, { c: string; i: string }> = {
+  MEJORA:    { c: '#27500A', i: '↑ MEJORA' },
+  ESTABLE:   { c: '#5F5E5A', i: '→ ESTABLE' },
+  DETERIORO: { c: '#791F1F', i: '↓ DETERIORO' },
+};
+
+const formatHoras = (h: number) => h >= 1 ? `${Math.round(h * 10) / 10}h` : `${Math.round(h * 60)}min`;
+
+function psicoEstado(vto: string | null): 'VIGENTE' | 'POR_VENCER' | 'VENCIDO' {
+  if (!vto) return 'VIGENTE';
+  const dias = Math.round((new Date(vto).getTime() - Date.now()) / 86400000);
+  if (dias < 0)  return 'VENCIDO';
+  if (dias < 30) return 'POR_VENCER';
+  return 'VIGENTE';
+}
 
 export const Dashboard: React.FC = () => {
+  const [data, setData]       = useState<DashboardData | null>(null);
+  const [error, setError]     = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const cargar = async () => {
+    try {
+      setError(null);
+      const d = await dashboardApi.get();
+      setData(d);
+    } catch (e: any) {
+      setError(e.message ?? 'Error al cargar el dashboard');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { cargar(); }, []);
+
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '300px', color: 'var(--gy)', fontSize: '13px' }}>
+      Cargando dashboard...
+    </div>
+  );
+
+  if (error) return (
+    <div style={{ background: '#FCEBEB', border: '0.5px solid #F09595', borderRadius: '12px', padding: '20px', color: '#A32D2D', fontSize: '13px' }}>
+      <b>Error al cargar dashboard:</b> {error}
+      <button className="btn" style={{ marginLeft: '16px' }} onClick={cargar}>Reintentar</button>
+    </div>
+  );
+
+  const kpis = data!.kpis;
+  const alertas = data!.alertas;
+
   return (
     <div>
       <div className="ph">
         <div>
           <div className="pt">Dashboard operacional</div>
-          <div className="ps">MODENACEAC · 6XSIM · React Version</div>
+          <div className="ps">MODENACEAC · 6XSIM</div>
         </div>
-        <button className="btn btnp" onClick={() => alert('Reporte ejecutivo PDF generado')}>
-          Exportar PDF
-        </button>
+        <button className="btn btnp" onClick={cargar}>Actualizar</button>
       </div>
 
+      {/* Alertas del sistema */}
+      {alertas.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '16px' }}>
+          {alertas.map((a, i) => (
+            <div key={i} style={{
+              padding: '10px 14px', borderRadius: '10px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '10px',
+              background: a.nivel === 'CRITICA' ? '#FCEBEB' : a.nivel === 'ADVERTENCIA' ? '#FAEEDA' : '#E6F1FB',
+              border: `0.5px solid ${a.nivel === 'CRITICA' ? '#F09595' : a.nivel === 'ADVERTENCIA' ? '#FAC775' : '#7ABAE8'}`,
+              color: a.nivel === 'CRITICA' ? '#A32D2D' : a.nivel === 'ADVERTENCIA' ? '#633806' : '#0A3466',
+            }}>
+              <b>{a.tipo}</b> {a.msg}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* KPIs principales */}
       <div className="g4">
         <div className="kpi">
-          <div className="kv">47</div>
+          <div className="kv">{kpis.sesionsMes}</div>
           <div className="kl">Sesiones este mes</div>
-          <div className="kt" style={{ color: '#27500A' }}>↑ +12% vs mes anterior</div>
+          <div className="kt" style={{ color: 'var(--gy)' }}>{kpis.sesionesHoy} hoy · {kpis.sesionesEnCurso} en curso</div>
         </div>
         <div className="kpi">
-          <div className="kv">94h</div>
+          <div className="kv">{formatHoras(kpis.horasMes)}</div>
           <div className="kl">Horas efectivas simulador</div>
-          <div className="kt" style={{ color: '#27500A' }}>↑ +8% vs mes anterior</div>
+          <div className="kt" style={{ color: 'var(--gy)' }}>~{kpis.promedioMinSesion} min promedio</div>
         </div>
         <div className="kpi">
-          <div className="kv">23</div>
-          <div className="kl">Pilotos entrenados</div>
-          <div className="kt" style={{ color: 'var(--gy)' }}>→ igual mes anterior</div>
+          <div className="kv">{kpis.totalPilotos}</div>
+          <div className="kl">Pilotos activos</div>
+          <div className="kt" style={{ color: kpis.pilotosPsicofisicoAlerta > 0 ? '#A32D2D' : 'var(--gy)' }}>
+            {kpis.pilotosPsicofisicoAlerta > 0 ? `${kpis.pilotosPsicofisicoAlerta} con psicofísico por vencer` : 'Psicofísicos al día'}
+          </div>
         </div>
         <div className="kpi">
-          <div className="kv" style={{ color: '#A32D2D' }}>3</div>
-          <div className="kl">Fallas abiertas</div>
-          <div className="kt" style={{ color: '#A32D2D' }}>2 pend. mantenimiento</div>
+          <div className="kv" style={{ color: kpis.tareasVencidas > 0 ? '#A32D2D' : 'inherit' }}>
+            {kpis.tareasVencidas}
+          </div>
+          <div className="kl">Tareas vencidas</div>
+          <div className="kt" style={{ color: kpis.tareasProximas > 0 ? '#EF9F27' : 'var(--gy)' }}>
+            {kpis.tareasProximas} próximas a vencer
+          </div>
         </div>
       </div>
 
-      <div className="g2">
-        <Card title="Estado de simuladores">
-          <div style={{ background: 'var(--gyl)', borderRadius: '10px', padding: '10px', marginBottom: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <div>
-                <div style={{ fontWeight: 500, fontSize: '12px' }}>AW109</div>
-                <div style={{ fontSize: '9px', color: 'var(--gy)' }}>X-Plane 11.55r2 · 192.168.1.101</div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '15px', fontWeight: 500 }}>27</div>
-                  <div style={{ fontSize: '9px', color: 'var(--gy)' }}>sesiones</div>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '15px', fontWeight: 500 }}>54h</div>
-                  <div style={{ fontSize: '9px', color: 'var(--gy)' }}>efectivas</div>
-                </div>
-                <Badge variant="bo">Operativo</Badge>
-              </div>
+      {/* Reservas extra */}
+      <div className="g4" style={{ marginTop: '-8px' }}>
+        <div className="kpi">
+          <div className="kv">{kpis.reservasHoy}</div>
+          <div className="kl">Reservas hoy</div>
+          <div className="kt" style={{ color: 'var(--gy)' }}>{kpis.reservasMañana} mañana</div>
+        </div>
+        <div className="kpi">
+          <div className="kv" style={{ color: kpis.logsNoResueltos > 0 ? '#EF9F27' : 'inherit' }}>{kpis.logsNoResueltos}</div>
+          <div className="kl">Incidentes sin resolver</div>
+          <div className="kt" style={{ color: 'var(--gy)' }}>Log técnico</div>
+        </div>
+        {data!.simuladores.map(s => (
+          <div className="kpi" key={s.id}>
+            <div className="kv" style={{ fontSize: '13px', fontWeight: 600 }}>{s.aeronave}</div>
+            <div className="kl">{s.nombre}</div>
+            <div className="kt">
+              {!s.operativo
+                ? <Badge variant="bvn">INOPERATIVO</Badge>
+                : s.enSesion
+                  ? <Badge variant="be">EN SESIÓN</Badge>
+                  : <Badge variant="bo">Operativo</Badge>}
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: 'var(--gy)', marginBottom: '3px' }}>
-              <span>Utilización mensual</span><span style={{ fontWeight: 500 }}>78%</span>
-            </div>
-            <div className="pbar"><div className="pf" style={{ width: '78%', background: '#185FA5' }}></div></div>
           </div>
-
-          <div style={{ background: 'var(--gyl)', borderRadius: '10px', padding: '10px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <div>
-                <div style={{ fontWeight: 500, fontSize: '12px' }}>Robinson R44</div>
-                <div style={{ fontSize: '9px', color: 'var(--gy)' }}>X-Plane 11.55r2 · 192.168.1.102</div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '15px', fontWeight: 500 }}>20</div>
-                  <div style={{ fontSize: '9px', color: 'var(--gy)' }}>sesiones</div>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '15px', fontWeight: 500 }}>40h</div>
-                  <div style={{ fontSize: '9px', color: 'var(--gy)' }}>efectivas</div>
-                </div>
-                <Badge variant="bmt">MANT activo</Badge>
-              </div>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: 'var(--gy)', marginBottom: '3px' }}>
-              <span>Utilización mensual</span><span style={{ fontWeight: 500 }}>62%</span>
-            </div>
-            <div className="pbar"><div className="pf" style={{ width: '62%', background: '#1D9E75' }}></div></div>
-          </div>
-        </Card>
-
-        <Card title="Alertas psicofísicos">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {PIL.filter(p => p.ps !== 'VIGENTE').map((p, i) => (
-              <div key={i} style={{ padding: '8px 12px', background: p.ps === 'VENCIDO' ? '#FCEBEB' : '#FAEEDA', border: `0.5px solid ${p.ps === 'VENCIDO' ? '#F09595' : '#FAC775'}`, borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div>
-                  <div style={{ fontWeight: 500, fontSize: '12px' }}>{p.n}</div>
-                  <div style={{ fontSize: '10px', color: 'var(--gy)' }}>{p.lic} · {p.vc}</div>
-                </div>
-                <Badge variant={PB[p.ps] as any}>{p.ps.replace('_', ' ')}</Badge>
-              </div>
-            ))}
-          </div>
-        </Card>
+        ))}
       </div>
 
-      <Card title="Desempeño de pilotos — último mes">
-        <table className="tbl">
-          <thead>
-            <tr>
-              <th>Piloto</th>
-              <th>Habilitaciones</th>
-              <th>Ses.</th>
-              <th>Hrs. sim.</th>
-              <th>Evaluaciones AS · S · SB · NA</th>
-              <th>Tendencia</th>
-            </tr>
-          </thead>
-          <tbody>
-            {PIL.map((p, i) => {
-              const v = [3, 6, 4, 1];
-              const tot = 14;
-              const sesCount = [8, 6, 5, 4, 3, 3][i];
-              return (
-                <tr key={i}>
-                  <td style={{ fontWeight: 500 }}>{p.n}</td>
-                  <td>
-                    <div className="tagr">
-                      {p.hab.map(h => <Badge key={h} variant="bv">{h}</Badge>)}
-                    </div>
-                  </td>
-                  <td style={{ textAlign: 'center' }}>{sesCount}</td>
-                  <td style={{ textAlign: 'center' }}>{p.hs}h</td>
-                  <td>
-                    <div style={{ fontSize: '9px', color: 'var(--gy)', marginBottom: '3px' }}>
-                      AS:{v[0]} S:{v[1]} SB:{v[2]} NA:{v[3]}
-                    </div>
-                    <div className="eb">
-                      <div className="es" style={{ width: `${Math.round(v[0] / tot * 100)}%`, background: '#EAF3DE', border: '0.5px solid #97C459' }}></div>
-                      <div className="es" style={{ width: `${Math.round(v[1] / tot * 100)}%`, background: '#E6F1FB', border: '0.5px solid #378ADD' }}></div>
-                      <div className="es" style={{ width: `${Math.round(v[2] / tot * 100)}%`, background: '#FAEEDA', border: '0.5px solid #FAC775' }}></div>
-                      <div className="es" style={{ width: `${Math.round(v[3] / tot * 100)}%`, background: '#F1EFE8' }}></div>
-                    </div>
-                  </td>
-                  <td style={{ fontWeight: 500, color: TD[p.td].c }}>{TD[p.td].i}</td>
+      {/* Próximas reservas del día */}
+      {data!.proximasReservas.length > 0 && (
+        <Card title="Próximas reservas del día">
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>Hora</th>
+                <th>Simulador</th>
+                <th>Piloto</th>
+                <th>Instructor</th>
+                <th>Tema</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data!.proximasReservas.map(r => (
+                <tr key={r.id}>
+                  <td style={{ fontWeight: 600 }}>{r.horaInicio} – {r.horaFin}</td>
+                  <td><b>{r.simulador.aeronave}</b></td>
+                  <td>{r.piloto ? `${r.piloto.nombre} ${r.piloto.apellido}` : <span style={{ color: 'var(--gy)', fontStyle: 'italic' }}>Sin asignar</span>}</td>
+                  <td>{r.instructor ? `${r.instructor.nombre} ${r.instructor.apellido}` : '—'}</td>
+                  <td style={{ color: 'var(--text-m)', fontSize: '11px' }}>{r.tema ?? '—'}</td>
+                  <td><Badge variant="bc">CONFIRMADA</Badge></td>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </Card>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+      )}
     </div>
   );
 };

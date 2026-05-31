@@ -58,7 +58,7 @@ type SesionCompleta = {
 };
 
 class PdfService {
-  private browser: puppeteer.Browser | null = null;
+  private browser: any = null;
 
   private async getBrowser() {
     if (!this.browser) {

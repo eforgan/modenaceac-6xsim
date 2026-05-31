@@ -89,7 +89,7 @@ export async function listarSesiones(req: Request, res: Response, next: NextFunc
 export async function obtenerSesion(req: Request, res: Response, next: NextFunction) {
   try {
     const sesion = await prisma.sesion.findUniqueOrThrow({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       include: {
         piloto:       true,
         instructor:   { select: { id: true, nombre: true, apellido: true, email: true } },
@@ -129,7 +129,7 @@ export async function crearSesion(req: Request, res: Response, next: NextFunctio
 export async function actualizarSesion(req: Request, res: Response, next: NextFunction) {
   try {
     const sesion = await prisma.sesion.update({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       data:  req.body,
     });
     res.json(sesion);
@@ -143,14 +143,14 @@ export async function finalizarSesion(req: Request, res: Response, next: NextFun
     const ahora = new Date();
 
     // Obtener sesión activa
-    const sesion = await prisma.sesion.findUniqueOrThrow({ where: { id: req.params.id } });
+    const sesion = await prisma.sesion.findUniqueOrThrow({ where: { id: req.params.id as string } });
     const duracionSeg = Math.round((ahora.getTime() - sesion.horaInicio.getTime()) / 1000);
 
     // Transacción: actualizar sesión + insertar evaluaciones y fallas
     const sesionFinal = await prisma.$transaction(async (tx) => {
       // Actualizar sesión
       const updated = await tx.sesion.update({
-        where: { id: req.params.id },
+        where: { id: req.params.id as string },
         data: {
           estado:           'COMPLETADA',
           horaFin:          ahora,
@@ -165,7 +165,7 @@ export async function finalizarSesion(req: Request, res: Response, next: NextFun
       if (data.evaluaciones?.length) {
         await tx.evalManiobra.createMany({
           data: data.evaluaciones.map(e => ({
-            sesionId:     req.params.id,
+            sesionId:     req.params.id as string,
             maniobraId:   e.maniobraId,
             nombre:       e.nombre,
             resultado:    e.resultado,
@@ -178,7 +178,7 @@ export async function finalizarSesion(req: Request, res: Response, next: NextFun
       if (data.fallasUsadas?.length) {
         await tx.fallaRegistro.createMany({
           data: data.fallasUsadas.map(f => ({
-            sesionId: req.params.id,
+            sesionId: req.params.id as string,
             fallaId:  f.fallaId,
             nombre:   f.nombre,
             dataref:  f.dataref,
@@ -217,7 +217,7 @@ export async function finalizarSesion(req: Request, res: Response, next: NextFun
 export async function generarPDF(req: Request, res: Response, next: NextFunction) {
   try {
     const sesion = await prisma.sesion.findUniqueOrThrow({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       include: {
         piloto:       true,
         instructor:   true,
@@ -231,7 +231,7 @@ export async function generarPDF(req: Request, res: Response, next: NextFunction
 
     // Guardar URL del PDF en la sesión
     await prisma.sesion.update({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       data:  { reportePdfUrl: pdfPath },
     });
 
@@ -241,7 +241,7 @@ export async function generarPDF(req: Request, res: Response, next: NextFunction
     if (req.query.download === '1') {
       res.download(pdfPath);
     } else {
-      res.json({ pdfUrl: `/pdfs/${req.params.id}.pdf` });
+      res.json({ pdfUrl: `/pdfs/${req.params.id as string}.pdf` });
     }
   } catch (err) { next(err); }
 }

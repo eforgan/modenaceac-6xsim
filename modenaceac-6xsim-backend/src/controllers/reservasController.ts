@@ -126,7 +126,7 @@ export async function semanaActual(req: Request, res: Response, next: NextFuncti
 export async function obtenerReserva(req: Request, res: Response, next: NextFunction) {
   try {
     const r = await prisma.reserva.findUniqueOrThrow({
-      where:   { id: req.params.id },
+      where:   { id: req.params.id as string },
       include: {
         simulador:  true,
         piloto:     true,
@@ -168,7 +168,7 @@ export async function actualizarReserva(req: Request, res: Response, next: NextF
 
     if (data.fecha && data.horaInicio && data.horaFin && data.simuladorId) {
       const solapa = await verificarSolapamiento(
-        data.simuladorId, data.fecha, data.horaInicio, data.horaFin, req.params.id,
+        data.simuladorId, data.fecha, data.horaInicio, data.horaFin, req.params.id as string,
       );
       if (solapa) {
         res.status(409).json({ error: 'Horario solapado con otra reserva en ese simulador' });
@@ -177,7 +177,7 @@ export async function actualizarReserva(req: Request, res: Response, next: NextF
     }
 
     const reserva = await prisma.reserva.update({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       data: { ...data, fecha: data.fecha ? new Date(data.fecha) : undefined },
     });
     res.json(reserva);
@@ -187,10 +187,10 @@ export async function actualizarReserva(req: Request, res: Response, next: NextF
 export async function cancelarReserva(req: Request, res: Response, next: NextFunction) {
   try {
     const reserva = await prisma.reserva.update({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       data:  { estado: 'CANCELADA' },
     });
-    logger.info(`Reserva cancelada: ${req.params.id}`);
+    logger.info(`Reserva cancelada: ${req.params.id as string}`);
     res.json(reserva);
   } catch (err) { next(err); }
 }

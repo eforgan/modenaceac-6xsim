@@ -122,7 +122,7 @@ export async function actualizarTarea(req: Request, res: Response, next: NextFun
   try {
     const data  = tareaSchema.partial().parse(req.body);
     const tarea = await prisma.tareaMantenimiento.update({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       data: {
         ...data,
         proximaFecha: data.proximaFecha ? new Date(data.proximaFecha) : undefined,
@@ -137,7 +137,7 @@ export async function completarTarea(req: Request, res: Response, next: NextFunc
     const { responsable, descripcion, horasMaquina } = completarSchema.parse(req.body);
 
     const tarea = await prisma.tareaMantenimiento.findUniqueOrThrow({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
     });
 
     const ahora      = new Date();
@@ -146,7 +146,7 @@ export async function completarTarea(req: Request, res: Response, next: NextFunc
     const [tareaActualizada] = await prisma.$transaction([
       // Actualizar tarea
       prisma.tareaMantenimiento.update({
-        where: { id: req.params.id },
+        where: { id: req.params.id as string },
         data: {
           estado:           'COMPLETADA',
           ultimaFecha:      ahora,
@@ -157,7 +157,7 @@ export async function completarTarea(req: Request, res: Response, next: NextFunc
       // Registrar en historial
       prisma.historialMantenimiento.create({
         data: {
-          tareaId:     req.params.id,
+          tareaId:     req.params.id as string,
           responsable,
           descripcion,
           horasMaquina,
@@ -166,7 +166,7 @@ export async function completarTarea(req: Request, res: Response, next: NextFunc
       // Crear la próxima ocurrencia si la frecuencia lo requiere
       ...(tarea.frecuencia !== 'POR_HORAS' ? [
         prisma.tareaMantenimiento.update({
-          where: { id: req.params.id },
+          where: { id: req.params.id as string },
           data:  { estado: 'PENDIENTE', proximaFecha },
         }),
       ] : []),
@@ -180,7 +180,7 @@ export async function completarTarea(req: Request, res: Response, next: NextFunc
 export async function historial(req: Request, res: Response, next: NextFunction) {
   try {
     const items = await prisma.historialMantenimiento.findMany({
-      where:   { tareaId: req.params.id },
+      where:   { tareaId: req.params.id as string },
       orderBy: { realizadoEn: 'desc' },
       take:    50,
     });

@@ -60,7 +60,7 @@ export async function listarPilotos(req: Request, res: Response, next: NextFunct
 export async function obtenerPiloto(req: Request, res: Response, next: NextFunction) {
   try {
     const piloto = await prisma.piloto.findUniqueOrThrow({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       include: {
         sesiones: {
           orderBy:  { fecha: 'desc' },
@@ -93,7 +93,7 @@ export async function actualizarPiloto(req: Request, res: Response, next: NextFu
   try {
     const data   = pilotoSchema.partial().parse(req.body);
     const piloto = await prisma.piloto.update({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       data: {
         ...data,
         psicofisicoVto: data.psicofisicoVto ? new Date(data.psicofisicoVto) : undefined,
@@ -106,21 +106,22 @@ export async function actualizarPiloto(req: Request, res: Response, next: NextFu
 export async function estadisticasPiloto(req: Request, res: Response, next: NextFunction) {
   try {
     const piloto = await prisma.piloto.findUniqueOrThrow({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
     });
 
     const [sesiones, evalDistrib] = await Promise.all([
       prisma.sesion.findMany({
-        where:    { pilotoId: req.params.id, estado: 'COMPLETADA' },
+        where:    { pilotoId: req.params.id as string, estado: 'COMPLETADA' },
         orderBy:  { fecha: 'desc' },
         select:   {
           fecha: true, duracionSeg: true, evaluacionGlobal: true,
+          simuladorId: true,
           simulador: { select: { aeronave: true } },
         },
       }),
       prisma.evalManiobra.groupBy({
         by:    ['resultado'],
-        where: { sesion: { pilotoId: req.params.id } },
+        where: { sesion: { pilotoId: req.params.id as string } },
         _count: { _all: true },
       }),
     ]);
@@ -140,7 +141,7 @@ export async function estadisticasPiloto(req: Request, res: Response, next: Next
         Object.entries(horasPorAeronave).map(([k, v]) => [k, Math.round(v * 10) / 10]),
       ),
       distribucionEvaluaciones: Object.fromEntries(
-        evalDistrib.map(e => [e.resultado, e._count._all]),
+        evalDistrib.map(e => [e.resultado, (e._count as { _all: number })._all]),
       ),
       ultimasSesiones: sesiones.slice(0, 5).map(s => ({
         fecha:            s.fecha,

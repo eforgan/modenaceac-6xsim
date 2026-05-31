@@ -8,15 +8,7 @@ const PORT = parseInt(process.env.PORT ?? '3000', 10);
 const HOST = process.env.HOST ?? '0.0.0.0';
 
 async function main() {
-  // Verificar conexión a DB
-  try {
-    await prisma.$connect();
-    logger.info('PostgreSQL conectado OK');
-  } catch (err) {
-    logger.error('Error conectando a PostgreSQL:', err);
-    process.exit(1);
-  }
-
+  // Arrancar el servidor primero para pasar health checks de Render/Railway
   const server = app.listen(PORT, HOST, () => {
     logger.info(`╔══════════════════════════════════════════════╗`);
     logger.info(`║   MODENACEAC 6XSIM Backend — v4.0            ║`);
@@ -24,6 +16,15 @@ async function main() {
     logger.info(`║   Entorno: ${process.env.NODE_ENV ?? 'development'}                    ║`);
     logger.info(`╚══════════════════════════════════════════════╝`);
   });
+
+  // Conectar a DB después de arrancar (Neon puede tardar en despertar)
+  try {
+    await prisma.$connect();
+    logger.info('PostgreSQL conectado OK');
+  } catch (err) {
+    logger.error('Error conectando a PostgreSQL:', err);
+    // No hacer process.exit — el servidor sigue respondiendo health checks
+  }
 
   // Graceful shutdown
   const shutdown = async (signal: string) => {

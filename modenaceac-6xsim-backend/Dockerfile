@@ -1,15 +1,14 @@
 # MODENACEAC 6XSIM — Dockerfile
-# Multi-stage build: builder → runner
+# Multi-stage build: builder → runner (Debian-based para evitar problemas de OpenSSL con Prisma)
 
 # ── Stage 1: Build ──────────────────────────────────────────────────────────
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 WORKDIR /app
 
-# Instalar dependencias nativas para Puppeteer
-RUN apk add --no-cache python3 make g++
+RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 COPY package*.json ./
-RUN npm ci --only=production && npm ci
+RUN npm ci
 
 COPY tsconfig.json ./
 COPY prisma/       ./prisma/
@@ -19,25 +18,21 @@ RUN npx prisma generate
 RUN npm run build
 
 # ── Stage 2: Runner ─────────────────────────────────────────────────────────
-FROM node:20-alpine AS runner
+FROM node:20-slim AS runner
 WORKDIR /app
 
-# Chromium para Puppeteer
-RUN apk add --no-cache \
-    chromium \
-    nss \
-    freetype \
-    harfbuzz \
+RUN apt-get update && apt-get install -y \
+    openssl \
     ca-certificates \
-    ttf-freefont \
-    font-noto \
-    curl
+    curl \
+    chromium \
+    --no-install-recommends && rm -rf /var/lib/apt/lists/*
 
 # Usuario no-root para seguridad
-RUN addgroup -g 1001 sixsim && adduser -u 1001 -G sixsim -s /bin/sh -D sixsim
+RUN groupadd -g 1001 sixsim && useradd -u 1001 -g sixsim -s /bin/sh -m sixsim
 
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 ENV NODE_ENV=production
 
 COPY --from=builder --chown=sixsim:sixsim /app/node_modules ./node_modules
